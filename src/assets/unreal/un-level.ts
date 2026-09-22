@@ -78,10 +78,15 @@ abstract class ULevel extends ULevelBase {
         for (const actorRef of this.actors || []) {
             if (!actorRef) continue;
 
+            // Do not load unrelated H5 actors just to discover their type.
+            // The dynamic UObject already has its native prototype before its
+            // serialized properties are loaded, so the scene-export method is
+            // a safe capability check. This keeps Terrain/Emitter/Light/etc.
+            // parsers outside the current StaticMeshActor migration boundary.
+            if (typeof (actorRef as any)?.getSceneExportInfo !== "function") continue;
+
             try {
                 const actor = actorRef.loadSelf() as any;
-                if (typeof actor?.getSceneExportInfo !== "function") continue;
-
                 const info = actor.getSceneExportInfo() as GD.IStaticMeshActorSceneExportInfo | null;
                 if (info) actors.push(info);
             } catch (error: any) {
