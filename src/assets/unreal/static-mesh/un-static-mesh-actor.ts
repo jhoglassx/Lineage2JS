@@ -171,7 +171,7 @@ abstract class UStaticMeshActor extends UAActor {
      * this method only describes the source actor, mesh reference and transform.
      */
     public getSceneExportInfo(): GD.IStaticMeshActorSceneExportInfo | null {
-        if (!this.mesh) return null;
+        if (this.isDeleteMe || this.isPendingDelete || !this.mesh) return null;
 
         const mesh = this.mesh.loadSelf() as GA.UStaticMesh;
         const meshRef = getSceneObjectReference(mesh);

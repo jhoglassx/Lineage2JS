@@ -297,6 +297,19 @@ declare global {
                     material: ISceneObjectReference | null
                 }
 
+                export interface ISceneExportError {
+                    actor: string | null,
+                    class: string | null,
+                    error: string
+                }
+
+                export interface ILevelStaticMeshSceneExportInfo {
+                    schemaVersion: 1,
+                    map: string | null,
+                    actors: IStaticMeshActorSceneExportInfo[],
+                    errors: ISceneExportError[]
+                }
+
                 export interface IStaticMeshActorSceneExportInfo {
                     schemaVersion: 1,
                     uuid: string,

@@ -66,3 +66,51 @@ H5 .unr
 ```
 
 The current scope is StaticMeshActor-compatible actors. Mover, terrain, lights, fog, emitters and other scene types should extend the same source-driven contract rather than creating separate ad-hoc conversion paths.
+
+### ULevel.getStaticMeshSceneExportInfo()
+
+The level now exposes a collection API that walks its actor table and invokes `getSceneExportInfo()` only on actors that support the scene contract. This keeps map exporters independent from protected Lineage2JS actor internals.
+
+The returned object is schema version 1:
+
+```json
+{
+  "schemaVersion": 1,
+  "map": "17_25",
+  "actors": [
+    {
+      "schemaVersion": 1,
+      "uuid": "...",
+      "type": "StaticMeshActor",
+      "name": "...",
+      "class": "StaticMeshActor",
+      "mesh": {
+        "uuid": "...",
+        "package": "...",
+        "path": "...",
+        "name": "...",
+        "class": "StaticMesh"
+      },
+      "skins": [],
+      "transform": {
+        "position": [0, 0, 0],
+        "quaternion": [0, 0, 0, 1],
+        "scale": [1, 1, 1],
+        "localToWorld": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        "source": {
+          "location": [0, 0, 0],
+          "rotation": { "pitch": 0, "yaw": 0, "roll": 0 },
+          "drawScale": 1,
+          "drawScale3D": [1, 1, 1],
+          "prePivot": [0, 0, 0],
+          "postPivot": [0, 0, 0]
+        }
+      },
+      "bounds": null
+    }
+  ],
+  "errors": []
+}
+```
+
+Actors marked deleted/pending-delete are intentionally omitted. Per-actor decode failures are captured in `errors` so one malformed object does not abort the entire map scene export.

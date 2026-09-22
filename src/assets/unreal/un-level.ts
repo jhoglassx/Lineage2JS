@@ -66,6 +66,41 @@ abstract class ULevel extends ULevelBase {
     public getActors() { return this.actors; }
     public getAmbientActors() { return this.ambientActors; }
 
+    /**
+     * Collect source-driven StaticMeshActor-compatible scene records.
+     * Actor-specific interpretation remains on the actor class itself; the
+     * level only discovers objects exposing getSceneExportInfo().
+     */
+    public getStaticMeshSceneExportInfo(): GD.ILevelStaticMeshSceneExportInfo {
+        const actors: GD.IStaticMeshActorSceneExportInfo[] = [];
+        const errors: GD.ISceneExportError[] = [];
+
+        for (const actorRef of this.actors || []) {
+            if (!actorRef) continue;
+
+            try {
+                const actor = actorRef.loadSelf() as any;
+                if (typeof actor?.getSceneExportInfo !== "function") continue;
+
+                const info = actor.getSceneExportInfo() as GD.IStaticMeshActorSceneExportInfo | null;
+                if (info) actors.push(info);
+            } catch (error: any) {
+                errors.push({
+                    actor: actorRef.objectName ?? actorRef.name ?? null,
+                    class: actorRef.constructor?.friendlyName ?? actorRef.constructor?.name ?? null,
+                    error: error?.stack ?? error?.message ?? String(error)
+                });
+            }
+        }
+
+        return {
+            schemaVersion: 1,
+            map: this.url?.map ?? null,
+            actors,
+            errors
+        };
+    }
+
     public doLoad(pkg: C.APackage, exp: C.UExport) {
         super.doLoad(pkg, exp);
 
