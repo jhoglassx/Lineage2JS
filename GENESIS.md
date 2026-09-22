@@ -38,6 +38,7 @@ Returns both the effective transform and the original UE2 values:
 - `scale`: `DrawScale3D * DrawScale`.
 - `localToWorld`: the native 4x4 UE2 matrix, with no Genesis/UE5 axis conversion applied.
 - `source.location`, `source.rotation`, `source.drawScale`, `source.drawScale3D`, `source.prePivot`, and `source.postPivot`: raw source values retained for diagnostics.
+- When H5 serialization omits a default-valued Actor property, scene transform calculation applies the canonical UE2 defaults (`Location/Rotation/PrePivot = 0`, `DrawScale = 1`, `DrawScale3D = 1`) before building LocalToWorld.
 
 The fork deliberately does **not** convert UE2 coordinates to UE5 coordinates. That conversion belongs to the Genesis coordinate bridge so it can be validated against the actual mesh import path (UModel/glTF/Interchange) once, centrally.
 

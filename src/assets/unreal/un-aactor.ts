@@ -127,23 +127,38 @@ abstract class UAActor extends UObject {
 
     public getWorldMatrixElements(): GD.Matrix4Arr {
         const gm = GMath();
-        const SR = gm.sin(this.rotation.roll),
-            SP = gm.sin(this.rotation.pitch),
-            SY = gm.sin(this.rotation.yaw),
-            CR = gm.cos(this.rotation.roll),
-            CP = gm.cos(this.rotation.pitch),
-            CY = gm.cos(this.rotation.yaw);
 
-        const LX = this.location.x,
-            LY = this.location.y,
-            LZ = this.location.z,
-            PX = this.prePivot.x,
-            PY = this.prePivot.y,
-            PZ = this.prePivot.z;
+        // UE2 omits default-valued properties from serialized actor instances.
+        // The older C4-oriented dynamic defaults do not always materialize
+        // every H5 Actor default, so scene reconstruction must apply the
+        // canonical UE2 defaults instead of dereferencing missing fields.
+        const rotation = this.rotation;
+        const roll = rotation?.roll ?? 0;
+        const pitch = rotation?.pitch ?? 0;
+        const yaw = rotation?.yaw ?? 0;
 
-        const DX = this.scale.x * this.drawScale,
-            DY = this.scale.y * this.drawScale,
-            DZ = this.scale.z * this.drawScale;
+        const SR = gm.sin(roll),
+            SP = gm.sin(pitch),
+            SY = gm.sin(yaw),
+            CR = gm.cos(roll),
+            CP = gm.cos(pitch),
+            CY = gm.cos(yaw);
+
+        const location = this.location;
+        const prePivot = this.prePivot;
+        const actorScale = this.scale;
+        const drawScale = typeof this.drawScale === "number" ? this.drawScale : 1;
+
+        const LX = location?.x ?? 0,
+            LY = location?.y ?? 0,
+            LZ = location?.z ?? 0,
+            PX = prePivot?.x ?? 0,
+            PY = prePivot?.y ?? 0,
+            PZ = prePivot?.z ?? 0;
+
+        const DX = (actorScale?.x ?? 1) * drawScale,
+            DY = (actorScale?.y ?? 1) * drawScale,
+            DZ = (actorScale?.z ?? 1) * drawScale;
 
         // Calculate UE2 matrix components (same as localToWorld)
         const ue2_XX = CP * CY * DX;
