@@ -305,6 +305,12 @@ declare global {
                     error: string
                 }
 
+                export interface ISceneDeferredActor {
+                    actor: string | null,
+                    class: string | null,
+                    reason: string
+                }
+
                 export interface ISceneSourcePackageInfo {
                     package: string | null,
                     path: string | null,
@@ -317,6 +323,7 @@ declare global {
                     map: string | null,
                     source: ISceneSourcePackageInfo,
                     actors: IStaticMeshActorSceneExportInfo[],
+                    deferredActors: ISceneDeferredActor[],
                     errors: ISceneExportError[]
                 }
 

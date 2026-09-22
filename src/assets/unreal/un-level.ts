@@ -73,6 +73,7 @@ abstract class ULevel extends ULevelBase {
      */
     public getStaticMeshSceneExportInfo(): GD.ILevelStaticMeshSceneExportInfo {
         const actors: GD.IStaticMeshActorSceneExportInfo[] = [];
+        const deferredActors: GD.ISceneDeferredActor[] = [];
         const errors: GD.ISceneExportError[] = [];
 
         for (const actorRef of this.actors || []) {
@@ -84,6 +85,28 @@ abstract class ULevel extends ULevelBase {
             // a safe capability check. This keeps Terrain/Emitter/Light/etc.
             // parsers outside the current StaticMeshActor migration boundary.
             if (typeof (actorRef as any)?.getSceneExportInfo !== "function") continue;
+
+            // Mover and MovableStaticMeshActor have additional chronicle-
+            // sensitive behavior/property layouts. Their base mesh placement
+            // is intentionally deferred until those actor types receive their
+            // own H5 audit; do not load them as a side effect of this export.
+            const ctor = actorRef.constructor as any;
+            const actorClass = ctor?.friendlyName ?? ctor?.name ?? null;
+            const inheritance = Array.isArray(ctor?.inheritenceChain)
+                ? ctor.inheritenceChain
+                : [];
+            const deferredClass = ["Mover", "MovableStaticMeshActor"].find(
+                name => actorClass === name || inheritance.includes(name)
+            );
+
+            if (deferredClass) {
+                deferredActors.push({
+                    actor: actorRef.objectName ?? actorRef.name ?? null,
+                    class: actorClass,
+                    reason: `H5 audit pending for ${deferredClass}`
+                });
+                continue;
+            }
 
             try {
                 const actor = actorRef.loadSelf() as any;
@@ -108,6 +131,7 @@ abstract class ULevel extends ULevelBase {
                 licenseeVersion: this.pkg?.header?.getLicenseeVersion?.() ?? null
             },
             actors,
+            deferredActors,
             errors
         };
     }

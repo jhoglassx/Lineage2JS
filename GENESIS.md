@@ -122,6 +122,7 @@ The returned object is schema version 1:
       "bounds": null
     }
   ],
+  "deferredActors": [],
   "errors": []
 }
 ```
@@ -151,6 +152,7 @@ Current status for the UE5 migration path:
 
 - `UStaticMeshActor.getSceneExportInfo()` does **not** call `StaticMesh.loadSelf()`. Loading the full Lineage2JS StaticMesh geometry would accidentally make an unvalidated C4-era geometry parser part of the H5 migration path.
 - `ULevel.getStaticMeshSceneExportInfo()` checks the scene-export capability before calling `loadSelf()`, so unrelated Terrain/Emitter/Light/etc. actors are not decoded as a side effect of StaticMeshActor migration.
+- `Mover` and `MovableStaticMeshActor` are reported as deferred and are not loaded by the current scene pass; their specialized H5 behavior remains outside the authority boundary until separately audited.
 - scene records and mesh/skin references use deterministic `sourceId` values. The normal Lineage2JS `uuid` contains a generated UUID and is session-random, so it is excluded from the Genesis scene contract.
 - mesh/skin references carry package path, object path and export index without forcing the referenced asset to decode.
 - each level scene report includes `archiveVersion` and `licenseeVersion`; compatibility can therefore be audited from generated artifacts instead of inferred from the Chronicle name.
