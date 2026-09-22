@@ -28,15 +28,25 @@ function getSceneObjectReference(value: any): GD.ISceneObjectReference | null {
     // Lineage2JS StaticMesh binary geometry is not the Genesis geometry source;
     // UModel is authoritative for mesh payloads. Metadata available on the
     // object reference is enough to resolve the imported UE5 asset later.
+    //
+    // Do not expose Lineage2JS's runtime uuid here: UObject.uuid contains a
+    // generated UUID and therefore changes between runs. External scene
+    // reconstruction needs a deterministic source identity.
     const ctor = value?.constructor;
     const pkg = value?.pkg;
+    const packagePath = pkg?.path ?? pkg?.name ?? "unknown-package";
+    const objectPath = value?.name ?? value?.objectName ?? "unknown-object";
+    const exportIndex = Number.isInteger(value?.exportIndex) ? value.exportIndex : null;
+    const sourceId = exportIndex !== null
+        ? `${packagePath}#export:${exportIndex}`
+        : `${packagePath}#object:${objectPath}`;
 
     return {
-        uuid: value?.uuid ?? null,
+        sourceId,
         package: pkg?.name ?? null,
         path: pkg?.path ?? null,
         objectPath: value?.name ?? null,
-        exportIndex: Number.isInteger(value?.exportIndex) ? value.exportIndex : null,
+        exportIndex,
         name: value?.objectName ?? value?.name ?? null,
         class: ctor?.friendlyName ?? ctor?.name ?? null
     };
@@ -182,7 +192,6 @@ abstract class UStaticMeshActor extends UAActor {
         return {
             schemaVersion: 1,
             sourceId: this.getSceneSourceId(),
-            uuid: this.uuid,
             exportIndex: Number.isInteger(this.exportIndex) ? this.exportIndex : null,
             objectPath: this.name ?? null,
             type: "StaticMeshActor",

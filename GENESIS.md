@@ -43,15 +43,18 @@ The fork deliberately does **not** convert UE2 coordinates to UE5 coordinates. T
 
 ### UStaticMeshActor.getSceneExportInfo()
 
-Returns schema version 1 metadata containing:
+Returns schema version 1, source-only metadata for external reconstruction:
 
-- Lineage2JS actor UUID, source name and source class;
-- mesh reference: UUID, package, package path, object name and class;
-- skin/material override references by slot;
-- the normalized scene transform above;
-- source-space world render bounds when Lineage2JS can calculate them.
+- deterministic `sourceId` based on package path + export index;
+- source name, source class, export index and object path;
+- mesh reference with deterministic source identity, package/path/name/class metadata;
+- skin/material override references by slot without forcing referenced assets to load;
+- the normalized UE2 scene transform above;
+- `bounds: null` by design.
 
-Bounds are diagnostic metadata and never block export. Missing skin entries are preserved as null references rather than guessed.
+Lineage2JS runtime `uuid` values are intentionally excluded from this contract because they contain a generated UUID and change between runs. Missing skin entries remain null rather than being guessed.
+
+The scene contract also deliberately avoids `StaticMesh.loadSelf()`. UModel remains the authoritative H5 geometry backend for Genesis; this API only supplies UE2 scene semantics and references.
 
 ### Intended pipeline
 
@@ -77,18 +80,28 @@ The returned object is schema version 1:
 {
   "schemaVersion": 1,
   "map": "17_25",
+  "source": {
+    "package": "17_25",
+    "path": "Maps/17_25.unr",
+    "archiveVersion": 0,
+    "licenseeVersion": 0
+  },
   "actors": [
     {
       "schemaVersion": 1,
-      "uuid": "...",
+      "sourceId": "Maps/17_25.unr#export:42",
+      "exportIndex": 42,
+      "objectPath": "17_25.StaticMeshActor42",
       "type": "StaticMeshActor",
-      "name": "...",
+      "name": "StaticMeshActor42",
       "class": "StaticMeshActor",
       "mesh": {
-        "uuid": "...",
-        "package": "...",
-        "path": "...",
-        "name": "...",
+        "sourceId": "StaticMeshes/example.usx#export:7",
+        "package": "example",
+        "path": "StaticMeshes/example.usx",
+        "objectPath": "example.MeshName",
+        "exportIndex": 7,
+        "name": "MeshName",
         "class": "StaticMesh"
       },
       "skins": [],
@@ -96,7 +109,7 @@ The returned object is schema version 1:
         "position": [0, 0, 0],
         "quaternion": [0, 0, 0, 1],
         "scale": [1, 1, 1],
-        "localToWorld": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        "localToWorld": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
         "source": {
           "location": [0, 0, 0],
           "rotation": { "pitch": 0, "yaw": 0, "roll": 0 },
@@ -137,7 +150,7 @@ Current status for the UE5 migration path:
 ### H5 scene-export safety rules
 
 - `UStaticMeshActor.getSceneExportInfo()` does **not** call `StaticMesh.loadSelf()`. Loading the full Lineage2JS StaticMesh geometry would accidentally make an unvalidated C4-era geometry parser part of the H5 migration path.
-- scene records use `sourceId = package path + export index` as the stable reconstruction identity. The normal Lineage2JS `uuid` contains a generated UUID and is session-random, so it must never be used as the UE5 actor identity.
+- scene records and mesh/skin references use deterministic `sourceId` values. The normal Lineage2JS `uuid` contains a generated UUID and is session-random, so it is excluded from the Genesis scene contract.
 - mesh/skin references carry package path, object path and export index without forcing the referenced asset to decode.
 - each level scene report includes `archiveVersion` and `licenseeVersion`; compatibility can therefore be audited from generated artifacts instead of inferred from the Chronicle name.
 - geometry bounds remain null in this source-only scene contract until they can be sourced from the authoritative Genesis geometry path.

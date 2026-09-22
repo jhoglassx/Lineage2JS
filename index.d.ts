@@ -262,7 +262,7 @@ declare global {
                 }
 
                 export interface ISceneObjectReference {
-                    uuid: string | null,
+                    sourceId: string,
                     package: string | null,
                     path: string | null,
                     objectPath: string | null,
@@ -323,7 +323,6 @@ declare global {
                 export interface IStaticMeshActorSceneExportInfo {
                     schemaVersion: 1,
                     sourceId: string,
-                    uuid: string,
                     exportIndex: number | null,
                     objectPath: string | null,
                     type: "StaticMeshActor",
