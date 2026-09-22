@@ -96,6 +96,12 @@ abstract class ULevel extends ULevelBase {
         return {
             schemaVersion: 1,
             map: this.url?.map ?? null,
+            source: {
+                package: this.pkg?.name ?? null,
+                path: this.pkg?.path ?? null,
+                archiveVersion: this.pkg?.header?.getArchiveFileVersion?.() ?? null,
+                licenseeVersion: this.pkg?.header?.getLicenseeVersion?.() ?? null
+            },
             actors,
             errors
         };

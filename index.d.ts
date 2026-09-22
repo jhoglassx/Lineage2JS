@@ -265,6 +265,8 @@ declare global {
                     uuid: string | null,
                     package: string | null,
                     path: string | null,
+                    objectPath: string | null,
+                    exportIndex: number | null,
                     name: string | null,
                     class: string | null
                 }
@@ -303,16 +305,27 @@ declare global {
                     error: string
                 }
 
+                export interface ISceneSourcePackageInfo {
+                    package: string | null,
+                    path: string | null,
+                    archiveVersion: number | null,
+                    licenseeVersion: number | null
+                }
+
                 export interface ILevelStaticMeshSceneExportInfo {
                     schemaVersion: 1,
                     map: string | null,
+                    source: ISceneSourcePackageInfo,
                     actors: IStaticMeshActorSceneExportInfo[],
                     errors: ISceneExportError[]
                 }
 
                 export interface IStaticMeshActorSceneExportInfo {
                     schemaVersion: 1,
+                    sourceId: string,
                     uuid: string,
+                    exportIndex: number | null,
+                    objectPath: string | null,
                     type: "StaticMeshActor",
                     name: string | null,
                     class: string | null,

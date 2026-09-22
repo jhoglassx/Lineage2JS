@@ -24,22 +24,20 @@ function getSwayPhase(uuid: string): number {
 function getSceneObjectReference(value: any): GD.ISceneObjectReference | null {
     if (!value) return null;
 
-    let loaded = value;
-    try {
-        loaded = typeof value.loadSelf === "function" ? value.loadSelf() : value;
-    } catch {
-        // Preserve whatever metadata is available on the original object ref.
-        loaded = value;
-    }
-
-    const ctor = loaded?.constructor ?? value?.constructor;
-    const pkg = loaded?.pkg ?? value?.pkg;
+    // H5 scene export must not force-load referenced assets. In particular,
+    // Lineage2JS StaticMesh binary geometry is not the Genesis geometry source;
+    // UModel is authoritative for mesh payloads. Metadata available on the
+    // object reference is enough to resolve the imported UE5 asset later.
+    const ctor = value?.constructor;
+    const pkg = value?.pkg;
 
     return {
-        uuid: loaded?.uuid ?? value?.uuid ?? null,
+        uuid: value?.uuid ?? null,
         package: pkg?.name ?? null,
         path: pkg?.path ?? null,
-        name: loaded?.objectName ?? loaded?.name ?? value?.objectName ?? value?.name ?? null,
+        objectPath: value?.name ?? null,
+        exportIndex: Number.isInteger(value?.exportIndex) ? value.exportIndex : null,
+        name: value?.objectName ?? value?.name ?? null,
         class: ctor?.friendlyName ?? ctor?.name ?? null
     };
 }
@@ -173,21 +171,8 @@ abstract class UStaticMeshActor extends UAActor {
     public getSceneExportInfo(): GD.IStaticMeshActorSceneExportInfo | null {
         if (this.isDeleteMe || this.isPendingDelete || !this.mesh) return null;
 
-        const mesh = this.mesh.loadSelf() as GA.UStaticMesh;
-        const meshRef = getSceneObjectReference(mesh);
+        const meshRef = getSceneObjectReference(this.mesh);
         if (!meshRef) return null;
-
-        let bounds: GD.IBoxDecodeInfo | null = null;
-        try {
-            const box = mesh.getRenderBoundingBox(this).transformBy(this.localToWorld());
-            bounds = {
-                isValid: true,
-                min: [box.min.x, box.min.y, box.min.z],
-                max: [box.max.x, box.max.y, box.max.z]
-            };
-        } catch {
-            // Bounds are useful diagnostics, but must never block scene export.
-        }
 
         const skins = getSceneArrayValues(this.skins).map((skin, slot) => ({
             slot,
@@ -196,14 +181,19 @@ abstract class UStaticMeshActor extends UAActor {
 
         return {
             schemaVersion: 1,
+            sourceId: this.getSceneSourceId(),
             uuid: this.uuid,
+            exportIndex: Number.isInteger(this.exportIndex) ? this.exportIndex : null,
+            objectPath: this.name ?? null,
             type: "StaticMeshActor",
             name: this.objectName ?? null,
             class: this.constructor.friendlyName ?? this.constructor.name ?? null,
             mesh: meshRef,
             skins,
             transform: this.getSceneTransformInfo(),
-            bounds
+            // Geometry/bounds are intentionally not decoded here for H5.
+            // UModel remains the authoritative Genesis geometry backend.
+            bounds: null
         };
     }
 

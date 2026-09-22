@@ -114,3 +114,30 @@ The returned object is schema version 1:
 ```
 
 Actors marked deleted/pending-delete are intentionally omitted. Per-actor decode failures are captured in `errors` so one malformed object does not abort the entire map scene export.
+
+## High Five compatibility audit - current migration scope
+
+Upstream targets older Lineage II data (the README documents C4), so Genesis does not assume that a successful parse implies High Five semantic parity.
+
+Current status for the UE5 migration path:
+
+| Area | H5 status | Genesis policy |
+| --- | --- | --- |
+| decoded UE2 package header/tables | VALIDATED-IN-PIPELINE | version metadata is emitted on scene reports; C4 fixture assertions were removed from the Genesis core fork |
+| Core/Engine script bytecode | H5-FIXED | unknown native-call indices are parsed by UE2 token class in the Genesis core fork |
+| material dependency discovery | H5-FIXED | High Five `GlowModifier` is registered in the Genesis core fork |
+| material semantics | CROSS-VALIDATED | Lineage2JS is primary semantic decoder; UEViewer is used as an independent witness for disputed edges/null state |
+| StaticMesh geometry | NOT AUTHORITATIVE | Genesis uses UModel for geometry; scene export must never force Lineage2JS StaticMesh geometry decode |
+| StaticMeshActor named properties | VALIDATED-IN-PIPELINE | used for mesh refs and transforms; source archive/license versions remain attached to the report |
+| actor transform math | READY-FOR-VISUAL-VALIDATION | Lineage2JS supplies UE2 LocalToWorld including PrePivot; the UE2->UE5 bridge is still intentionally outside this fork |
+| Terrain/BSP | NOT YET H5-VALIDATED FOR GENESIS | do not use as migration authority until cross-backend/visual validation is completed |
+| SkeletalMesh/Animation | NOT YET H5-VALIDATED FOR GENESIS | UEViewer shows multiple Lineage2 version-gated layouts; audit separately before character migration |
+| Emitters/Lights/Fog/Movers | NOT YET H5-VALIDATED FOR GENESIS | extend only after map StaticMeshActor reconstruction is proven |
+
+### H5 scene-export safety rules
+
+- `UStaticMeshActor.getSceneExportInfo()` does **not** call `StaticMesh.loadSelf()`. Loading the full Lineage2JS StaticMesh geometry would accidentally make an unvalidated C4-era geometry parser part of the H5 migration path.
+- scene records use `sourceId = package path + export index` as the stable reconstruction identity. The normal Lineage2JS `uuid` contains a generated UUID and is session-random, so it must never be used as the UE5 actor identity.
+- mesh/skin references carry package path, object path and export index without forcing the referenced asset to decode.
+- each level scene report includes `archiveVersion` and `licenseeVersion`; compatibility can therefore be audited from generated artifacts instead of inferred from the Chronicle name.
+- geometry bounds remain null in this source-only scene contract until they can be sourced from the authoritative Genesis geometry path.

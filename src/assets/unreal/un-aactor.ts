@@ -180,6 +180,15 @@ abstract class UAActor extends UObject {
      * Raw UE2 values are kept under `source` for diagnostics and future
      * coordinate-system bridges.
      */
+    /** Stable identity for external reconstruction. Lineage2JS `uuid` is session-random. */
+    public getSceneSourceId(): string {
+        const packagePath = this.pkg?.path ?? this.pkg?.name ?? "unknown-package";
+        const objectPath = this.name ?? this.objectName ?? "unknown-object";
+        const exportPart = Number.isInteger(this.exportIndex) ? `export:${this.exportIndex}` : objectPath;
+
+        return `${packagePath}#${exportPart}`;
+    }
+
     public getSceneTransformInfo(): GD.IActorSceneTransformDecodeInfo {
         const localToWorld = this.getWorldMatrixElements();
         const sourceLocation = this.location?.getElements() || [0, 0, 0];
