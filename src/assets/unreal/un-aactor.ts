@@ -171,6 +171,45 @@ abstract class UAActor extends UObject {
         ];
     }
 
+    /**
+     * Export the actor transform in a source-driven form suitable for external
+     * scene reconstruction (for example the Genesis UE5 migration pipeline).
+     *
+     * `position` is the translation of UE2's full LocalToWorld matrix, not
+     * merely Actor.Location. This intentionally preserves PrePivot semantics.
+     * Raw UE2 values are kept under `source` for diagnostics and future
+     * coordinate-system bridges.
+     */
+    public getSceneTransformInfo(): GD.IActorSceneTransformDecodeInfo {
+        const localToWorld = this.getWorldMatrixElements();
+        const sourceLocation = this.location?.getElements() || [0, 0, 0];
+        const sourceScale = this.scale?.getElements() || [1, 1, 1];
+        const drawScale = typeof this.drawScale === "number" ? this.drawScale : 1;
+        const effectiveScale = sourceScale.map(value => value * drawScale) as GD.Vector3Arr;
+        const rotation = this.rotation
+            ? {
+                pitch: this.rotation.pitch,
+                yaw: this.rotation.yaw,
+                roll: this.rotation.roll
+            }
+            : { pitch: 0, yaw: 0, roll: 0 };
+
+        return {
+            position: [localToWorld[12], localToWorld[13], localToWorld[14]],
+            quaternion: this.rotation?.getQuaternionElements() || [0, 0, 0, 1],
+            scale: effectiveScale,
+            localToWorld,
+            source: {
+                location: sourceLocation,
+                rotation,
+                drawScale,
+                drawScale3D: sourceScale,
+                prePivot: this.prePivot?.getElements() || [0, 0, 0],
+                postPivot: this.postPivot?.getElements() || [0, 0, 0]
+            }
+        };
+    }
+
     protected getRegionLineHelper(color: [number, number, number] = [1, 0, 1], ignoreDepth: boolean = false) {
         const lineGeometryUuid = generateUUID();
         const _a = this.region.getZone().location;

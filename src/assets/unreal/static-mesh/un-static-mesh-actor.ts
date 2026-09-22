@@ -21,6 +21,50 @@ function getSwayPhase(uuid: string): number {
     return cyrb53(uuid) / Number.MAX_SAFE_INTEGER * Math.PI * 2;
 }
 
+function getSceneObjectReference(value: any): GD.ISceneObjectReference | null {
+    if (!value) return null;
+
+    let loaded = value;
+    try {
+        loaded = typeof value.loadSelf === "function" ? value.loadSelf() : value;
+    } catch {
+        // Preserve whatever metadata is available on the original object ref.
+        loaded = value;
+    }
+
+    const ctor = loaded?.constructor ?? value?.constructor;
+    const pkg = loaded?.pkg ?? value?.pkg;
+
+    return {
+        uuid: loaded?.uuid ?? value?.uuid ?? null,
+        package: pkg?.name ?? null,
+        path: pkg?.path ?? null,
+        name: loaded?.objectName ?? loaded?.name ?? value?.objectName ?? value?.name ?? null,
+        class: ctor?.friendlyName ?? ctor?.name ?? null
+    };
+}
+
+function getSceneArrayValues(value: any): any[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+
+    const count = typeof value.getElemCount === "function"
+        ? Number(value.getElemCount())
+        : typeof value.length === "number"
+            ? Number(value.length)
+            : 0;
+
+    const result: any[] = [];
+    for (let index = 0; index < count; index++) {
+        result.push(
+            typeof value.getElem === "function"
+                ? value.getElem(index)
+                : value[index]
+        );
+    }
+    return result;
+}
+
 abstract class UStaticMeshActor extends UAActor {
 
     declare protected mesh: GA.UStaticMesh | GA.UTexture;
@@ -120,6 +164,48 @@ abstract class UStaticMeshActor extends UAActor {
     }
 
     protected getActorDecodeInfo(): Partial<GD.IStaticMeshActorDecodeInfo> { return {}; }
+
+    /**
+     * Return deterministic source metadata for rebuilding this actor in an
+     * external scene. Geometry/material extraction remains in getDecodeInfo();
+     * this method only describes the source actor, mesh reference and transform.
+     */
+    public getSceneExportInfo(): GD.IStaticMeshActorSceneExportInfo | null {
+        if (!this.mesh) return null;
+
+        const mesh = this.mesh.loadSelf() as GA.UStaticMesh;
+        const meshRef = getSceneObjectReference(mesh);
+        if (!meshRef) return null;
+
+        let bounds: GD.IBoxDecodeInfo | null = null;
+        try {
+            const box = mesh.getRenderBoundingBox(this).transformBy(this.localToWorld());
+            bounds = {
+                isValid: true,
+                min: [box.min.x, box.min.y, box.min.z],
+                max: [box.max.x, box.max.y, box.max.z]
+            };
+        } catch {
+            // Bounds are useful diagnostics, but must never block scene export.
+        }
+
+        const skins = getSceneArrayValues(this.skins).map((skin, slot) => ({
+            slot,
+            material: getSceneObjectReference(skin)
+        } as GD.ISceneSkinReference));
+
+        return {
+            schemaVersion: 1,
+            uuid: this.uuid,
+            type: "StaticMeshActor",
+            name: this.objectName ?? null,
+            class: this.constructor.friendlyName ?? this.constructor.name ?? null,
+            mesh: meshRef,
+            skins,
+            transform: this.getSceneTransformInfo(),
+            bounds
+        };
+    }
 
     public getDecodeInfo(builder: GD.DecodeLibraryBuilder): StaticMeshActorDecodeResult_T {
         const library = builder.library;

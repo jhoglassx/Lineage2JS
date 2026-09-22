@@ -261,6 +261,54 @@ declare global {
                     isRangeIgnored?: boolean
                 }
 
+                export interface ISceneObjectReference {
+                    uuid: string | null,
+                    package: string | null,
+                    path: string | null,
+                    name: string | null,
+                    class: string | null
+                }
+
+                export interface IActorSourceRotationDecodeInfo {
+                    pitch: number,
+                    yaw: number,
+                    roll: number
+                }
+
+                export interface IActorSourceTransformDecodeInfo {
+                    location: Vector3Arr,
+                    rotation: IActorSourceRotationDecodeInfo,
+                    drawScale: number,
+                    drawScale3D: Vector3Arr,
+                    prePivot: Vector3Arr,
+                    postPivot: Vector3Arr
+                }
+
+                export interface IActorSceneTransformDecodeInfo {
+                    position: Vector3Arr,
+                    quaternion: QuaternionArr,
+                    scale: Vector3Arr,
+                    localToWorld: Matrix4Arr,
+                    source: IActorSourceTransformDecodeInfo
+                }
+
+                export interface ISceneSkinReference {
+                    slot: number,
+                    material: ISceneObjectReference | null
+                }
+
+                export interface IStaticMeshActorSceneExportInfo {
+                    schemaVersion: 1,
+                    uuid: string,
+                    type: "StaticMeshActor",
+                    name: string | null,
+                    class: string | null,
+                    mesh: ISceneObjectReference,
+                    skins: ISceneSkinReference[],
+                    transform: IActorSceneTransformDecodeInfo,
+                    bounds: IBoxDecodeInfo | null
+                }
+
                 export interface IStaticMeshActorDecodeInfo extends IBaseObjectDecodeInfo {
                     actorName: string;
                     type: "StaticMeshActor",
