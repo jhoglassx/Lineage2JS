@@ -21,6 +21,58 @@ function getSwayPhase(uuid: string): number {
     return cyrb53(uuid) / Number.MAX_SAFE_INTEGER * Math.PI * 2;
 }
 
+function getSceneObjectReference(value: any): GD.ISceneObjectReference | null {
+    if (!value) return null;
+
+    // H5 scene export must not force-load referenced assets. In particular,
+    // Lineage2JS StaticMesh binary geometry is not the Genesis geometry source;
+    // UModel is authoritative for mesh payloads. Metadata available on the
+    // object reference is enough to resolve the imported UE5 asset later.
+    //
+    // Do not expose Lineage2JS's runtime uuid here: UObject.uuid contains a
+    // generated UUID and therefore changes between runs. External scene
+    // reconstruction needs a deterministic source identity.
+    const ctor = value?.constructor;
+    const pkg = value?.pkg;
+    const packagePath = pkg?.path ?? pkg?.name ?? "unknown-package";
+    const objectPath = value?.name ?? value?.objectName ?? "unknown-object";
+    const exportIndex = Number.isInteger(value?.exportIndex) ? value.exportIndex : null;
+    const sourceId = exportIndex !== null
+        ? `${packagePath}#export:${exportIndex}`
+        : `${packagePath}#object:${objectPath}`;
+
+    return {
+        sourceId,
+        package: pkg?.name ?? null,
+        path: pkg?.path ?? null,
+        objectPath: value?.name ?? null,
+        exportIndex,
+        name: value?.objectName ?? value?.name ?? null,
+        class: ctor?.friendlyName ?? ctor?.name ?? null
+    };
+}
+
+function getSceneArrayValues(value: any): any[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+
+    const count = typeof value.getElemCount === "function"
+        ? Number(value.getElemCount())
+        : typeof value.length === "number"
+            ? Number(value.length)
+            : 0;
+
+    const result: any[] = [];
+    for (let index = 0; index < count; index++) {
+        result.push(
+            typeof value.getElem === "function"
+                ? value.getElem(index)
+                : value[index]
+        );
+    }
+    return result;
+}
+
 abstract class UStaticMeshActor extends UAActor {
 
     declare protected mesh: GA.UStaticMesh | GA.UTexture;
@@ -120,6 +172,39 @@ abstract class UStaticMeshActor extends UAActor {
     }
 
     protected getActorDecodeInfo(): Partial<GD.IStaticMeshActorDecodeInfo> { return {}; }
+
+    /**
+     * Return deterministic source metadata for rebuilding this actor in an
+     * external scene. Geometry/material extraction remains in getDecodeInfo();
+     * this method only describes the source actor, mesh reference and transform.
+     */
+    public getSceneExportInfo(): GD.IStaticMeshActorSceneExportInfo | null {
+        if (this.isDeleteMe || this.isPendingDelete || !this.mesh) return null;
+
+        const meshRef = getSceneObjectReference(this.mesh);
+        if (!meshRef) return null;
+
+        const skins = getSceneArrayValues(this.skins).map((skin, slot) => ({
+            slot,
+            material: getSceneObjectReference(skin)
+        } as GD.ISceneSkinReference));
+
+        return {
+            schemaVersion: 1,
+            sourceId: this.getSceneSourceId(),
+            exportIndex: Number.isInteger(this.exportIndex) ? this.exportIndex : null,
+            objectPath: this.name ?? null,
+            type: "StaticMeshActor",
+            name: this.objectName ?? null,
+            class: this.constructor.friendlyName ?? this.constructor.name ?? null,
+            mesh: meshRef,
+            skins,
+            transform: this.getSceneTransformInfo(),
+            // Geometry/bounds are intentionally not decoded here for H5.
+            // UModel remains the authoritative Genesis geometry backend.
+            bounds: null
+        };
+    }
 
     public getDecodeInfo(builder: GD.DecodeLibraryBuilder): StaticMeshActorDecodeResult_T {
         const library = builder.library;

@@ -127,23 +127,38 @@ abstract class UAActor extends UObject {
 
     public getWorldMatrixElements(): GD.Matrix4Arr {
         const gm = GMath();
-        const SR = gm.sin(this.rotation.roll),
-            SP = gm.sin(this.rotation.pitch),
-            SY = gm.sin(this.rotation.yaw),
-            CR = gm.cos(this.rotation.roll),
-            CP = gm.cos(this.rotation.pitch),
-            CY = gm.cos(this.rotation.yaw);
 
-        const LX = this.location.x,
-            LY = this.location.y,
-            LZ = this.location.z,
-            PX = this.prePivot.x,
-            PY = this.prePivot.y,
-            PZ = this.prePivot.z;
+        // UE2 omits default-valued properties from serialized actor instances.
+        // The older C4-oriented dynamic defaults do not always materialize
+        // every H5 Actor default, so scene reconstruction must apply the
+        // canonical UE2 defaults instead of dereferencing missing fields.
+        const rotation = this.rotation;
+        const roll = rotation?.roll ?? 0;
+        const pitch = rotation?.pitch ?? 0;
+        const yaw = rotation?.yaw ?? 0;
 
-        const DX = this.scale.x * this.drawScale,
-            DY = this.scale.y * this.drawScale,
-            DZ = this.scale.z * this.drawScale;
+        const SR = gm.sin(roll),
+            SP = gm.sin(pitch),
+            SY = gm.sin(yaw),
+            CR = gm.cos(roll),
+            CP = gm.cos(pitch),
+            CY = gm.cos(yaw);
+
+        const location = this.location;
+        const prePivot = this.prePivot;
+        const actorScale = this.scale;
+        const drawScale = typeof this.drawScale === "number" ? this.drawScale : 1;
+
+        const LX = location?.x ?? 0,
+            LY = location?.y ?? 0,
+            LZ = location?.z ?? 0,
+            PX = prePivot?.x ?? 0,
+            PY = prePivot?.y ?? 0,
+            PZ = prePivot?.z ?? 0;
+
+        const DX = (actorScale?.x ?? 1) * drawScale,
+            DY = (actorScale?.y ?? 1) * drawScale,
+            DZ = (actorScale?.z ?? 1) * drawScale;
 
         // Calculate UE2 matrix components (same as localToWorld)
         const ue2_XX = CP * CY * DX;
@@ -169,6 +184,56 @@ abstract class UAActor extends UObject {
             ue2_ZX, ue2_ZY, ue2_ZZ, 0,
             ue2_WX, ue2_WY, ue2_WZ, 1
         ];
+    }
+
+    /** Stable identity for external reconstruction. Lineage2JS `uuid` is session-random. */
+    public getSceneSourceId(): string {
+        const packagePath = this.pkg?.path ?? this.pkg?.name ?? "unknown-package";
+        const objectPath = this.name ?? this.objectName ?? "unknown-object";
+        const exportPart = Number.isInteger(this.exportIndex)
+            ? `export:${this.exportIndex}`
+            : `object:${objectPath}`;
+
+        return `${packagePath}#${exportPart}`;
+    }
+
+    /**
+     * Export the actor transform in a source-driven form suitable for external
+     * scene reconstruction (for example the Genesis UE5 migration pipeline).
+     *
+     * `position` is the translation of UE2's full LocalToWorld matrix, not
+     * merely Actor.Location. This intentionally preserves PrePivot semantics.
+     * Raw UE2 values are kept under `source` for diagnostics and future
+     * coordinate-system bridges.
+     */
+    public getSceneTransformInfo(): GD.IActorSceneTransformDecodeInfo {
+        const localToWorld = this.getWorldMatrixElements();
+        const sourceLocation = this.location?.getElements() || [0, 0, 0];
+        const sourceScale = this.scale?.getElements() || [1, 1, 1];
+        const drawScale = typeof this.drawScale === "number" ? this.drawScale : 1;
+        const effectiveScale = sourceScale.map(value => value * drawScale) as GD.Vector3Arr;
+        const rotation = this.rotation
+            ? {
+                pitch: this.rotation.pitch,
+                yaw: this.rotation.yaw,
+                roll: this.rotation.roll
+            }
+            : { pitch: 0, yaw: 0, roll: 0 };
+
+        return {
+            position: [localToWorld[12], localToWorld[13], localToWorld[14]],
+            quaternion: this.rotation?.getQuaternionElements() || [0, 0, 0, 1],
+            scale: effectiveScale,
+            localToWorld,
+            source: {
+                location: sourceLocation,
+                rotation,
+                drawScale,
+                drawScale3D: sourceScale,
+                prePivot: this.prePivot?.getElements() || [0, 0, 0],
+                postPivot: this.postPivot?.getElements() || [0, 0, 0]
+            }
+        };
     }
 
     protected getRegionLineHelper(color: [number, number, number] = [1, 0, 1], ignoreDepth: boolean = false) {

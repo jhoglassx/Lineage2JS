@@ -261,6 +261,86 @@ declare global {
                     isRangeIgnored?: boolean
                 }
 
+                export interface ISceneObjectReference {
+                    sourceId: string,
+                    package: string | null,
+                    path: string | null,
+                    objectPath: string | null,
+                    exportIndex: number | null,
+                    name: string | null,
+                    class: string | null
+                }
+
+                export interface IActorSourceRotationDecodeInfo {
+                    pitch: number,
+                    yaw: number,
+                    roll: number
+                }
+
+                export interface IActorSourceTransformDecodeInfo {
+                    location: Vector3Arr,
+                    rotation: IActorSourceRotationDecodeInfo,
+                    drawScale: number,
+                    drawScale3D: Vector3Arr,
+                    prePivot: Vector3Arr,
+                    postPivot: Vector3Arr
+                }
+
+                export interface IActorSceneTransformDecodeInfo {
+                    position: Vector3Arr,
+                    quaternion: QuaternionArr,
+                    scale: Vector3Arr,
+                    localToWorld: Matrix4Arr,
+                    source: IActorSourceTransformDecodeInfo
+                }
+
+                export interface ISceneSkinReference {
+                    slot: number,
+                    material: ISceneObjectReference | null
+                }
+
+                export interface ISceneExportError {
+                    actor: string | null,
+                    class: string | null,
+                    error: string
+                }
+
+                export interface ISceneDeferredActor {
+                    actor: string | null,
+                    class: string | null,
+                    reason: string
+                }
+
+                export interface ISceneSourcePackageInfo {
+                    package: string | null,
+                    path: string | null,
+                    archiveVersion: number | null,
+                    licenseeVersion: number | null
+                }
+
+                export interface ILevelStaticMeshSceneExportInfo {
+                    schemaVersion: 1,
+                    map: string | null,
+                    source: ISceneSourcePackageInfo,
+                    actors: IStaticMeshActorSceneExportInfo[],
+                    deferredActors: ISceneDeferredActor[],
+                    errors: ISceneExportError[]
+                }
+
+                export interface IStaticMeshActorSceneExportInfo {
+                    schemaVersion: 1,
+                    sourceId: string,
+                    exportIndex: number | null,
+                    objectPath: string | null,
+                    type: "StaticMeshActor",
+                    name: string | null,
+                    class: string | null,
+                    mesh: ISceneObjectReference,
+                    skins: ISceneSkinReference[],
+                    transform: IActorSceneTransformDecodeInfo,
+                    bounds: IBoxDecodeInfo | null
+                }
+
                 export interface IStaticMeshActorDecodeInfo extends IBaseObjectDecodeInfo {
                     actorName: string;
                     type: "StaticMeshActor",

@@ -66,6 +66,92 @@ abstract class ULevel extends ULevelBase {
     public getActors() { return this.actors; }
     public getAmbientActors() { return this.ambientActors; }
 
+    /**
+     * Collect source-driven StaticMeshActor-compatible scene records.
+     * Actor-specific interpretation remains on the actor class itself; the
+     * level only discovers objects exposing getSceneExportInfo().
+     */
+    public getStaticMeshSceneExportInfo(): GD.ILevelStaticMeshSceneExportInfo {
+        const actors: GD.IStaticMeshActorSceneExportInfo[] = [];
+        const deferredActors: GD.ISceneDeferredActor[] = [];
+        const errors: GD.ISceneExportError[] = [];
+
+        for (const actorRef of this.actors || []) {
+            if (!actorRef) continue;
+
+            // Do not load unrelated H5 actors just to discover their type.
+            // The dynamic UObject already has its native prototype before its
+            // serialized properties are loaded, so the scene-export method is
+            // a safe capability check. This keeps Terrain/Emitter/Light/etc.
+            // parsers outside the current StaticMeshActor migration boundary.
+            if (typeof (actorRef as any)?.getSceneExportInfo !== "function") continue;
+
+            // Mover and MovableStaticMeshActor have additional chronicle-
+            // sensitive behavior/property layouts. Their base mesh placement
+            // is intentionally deferred until those actor types receive their
+            // own H5 audit; do not load them as a side effect of this export.
+            const ctor = actorRef.constructor as any;
+            const actorClass = ctor?.friendlyName ?? ctor?.name ?? null;
+
+            // Do not use UObject.inheritenceChain here. Dynamic package classes
+            // can inherit through native abstract bases whose getConstructorName()
+            // intentionally throws. For H5 scene discovery we only need a safe
+            // runtime constructor/prototype walk that never asks the serializer
+            // to reconstruct UnrealScript inheritance names.
+            const runtimeClassNames: string[] = [];
+            let currentCtor = ctor;
+            while (currentCtor && currentCtor !== Function.prototype) {
+                const currentName = currentCtor?.friendlyName ?? currentCtor?.name ?? null;
+                if (currentName && !runtimeClassNames.includes(currentName)) {
+                    runtimeClassNames.push(currentName);
+                }
+
+                const nextCtor = Object.getPrototypeOf(currentCtor);
+                if (!nextCtor || nextCtor === currentCtor) break;
+                currentCtor = nextCtor;
+            }
+
+            const deferredClass = ["Mover", "MovableStaticMeshActor"].find(
+                name => runtimeClassNames.includes(name)
+            );
+
+            if (deferredClass) {
+                deferredActors.push({
+                    actor: actorRef.objectName ?? actorRef.name ?? null,
+                    class: actorClass,
+                    reason: `H5 audit pending for ${deferredClass}`
+                });
+                continue;
+            }
+
+            try {
+                const actor = actorRef.loadSelf() as any;
+                const info = actor.getSceneExportInfo() as GD.IStaticMeshActorSceneExportInfo | null;
+                if (info) actors.push(info);
+            } catch (error: any) {
+                errors.push({
+                    actor: actorRef.objectName ?? actorRef.name ?? null,
+                    class: actorRef.constructor?.friendlyName ?? actorRef.constructor?.name ?? null,
+                    error: error?.stack ?? error?.message ?? String(error)
+                });
+            }
+        }
+
+        return {
+            schemaVersion: 1,
+            map: this.url?.map ?? null,
+            source: {
+                package: this.pkg?.name ?? null,
+                path: this.pkg?.path ?? null,
+                archiveVersion: this.pkg?.header?.getArchiveFileVersion?.() ?? null,
+                licenseeVersion: this.pkg?.header?.getLicenseeVersion?.() ?? null
+            },
+            actors,
+            deferredActors,
+            errors
+        };
+    }
+
     public doLoad(pkg: C.APackage, exp: C.UExport) {
         super.doLoad(pkg, exp);
 
