@@ -154,3 +154,18 @@ Current status for the UE5 migration path:
 - mesh/skin references carry package path, object path and export index without forcing the referenced asset to decode.
 - each level scene report includes `archiveVersion` and `licenseeVersion`; compatibility can therefore be audited from generated artifacts instead of inferred from the Chronicle name.
 - geometry bounds remain null in this source-only scene contract until they can be sourced from the authoritative Genesis geometry path.
+
+## High Five compatibility policy
+
+Upstream `stable` targets older Lineage II data (the upstream README documents C4). Genesis therefore treats High Five compatibility as an explicit, versioned contract rather than assuming forward compatibility.
+
+Rules for `genesis/stable`:
+
+- low-level package fixes live in the pinned `jhoglassx/l2js-core` Genesis revision;
+- every H5 report should preserve Unreal archive/licensee versions so format decisions can be traced to the actual source package;
+- parsing success is not considered semantic validation;
+- StaticMesh geometry is not authoritative for the Genesis migration path; UModel remains the geometry backend until Lineage2JS H5 geometry is separately validated;
+- material disagreements are cross-checked against UEViewer rather than guessed;
+- Terrain/BSP, SkeletalMesh/Animation, emitters, lights and other systems must be audited independently before they become migration authorities.
+
+The current Genesis core pin includes H5 native-token parsing, GlowModifier package dependency support, and removal of an upstream C4 map-specific package-header fixture.
