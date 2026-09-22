@@ -92,11 +92,27 @@ abstract class ULevel extends ULevelBase {
             // own H5 audit; do not load them as a side effect of this export.
             const ctor = actorRef.constructor as any;
             const actorClass = ctor?.friendlyName ?? ctor?.name ?? null;
-            const inheritance = Array.isArray(ctor?.inheritenceChain)
-                ? ctor.inheritenceChain
-                : [];
+
+            // Do not use UObject.inheritenceChain here. Dynamic package classes
+            // can inherit through native abstract bases whose getConstructorName()
+            // intentionally throws. For H5 scene discovery we only need a safe
+            // runtime constructor/prototype walk that never asks the serializer
+            // to reconstruct UnrealScript inheritance names.
+            const runtimeClassNames: string[] = [];
+            let currentCtor = ctor;
+            while (currentCtor && currentCtor !== Function.prototype) {
+                const currentName = currentCtor?.friendlyName ?? currentCtor?.name ?? null;
+                if (currentName && !runtimeClassNames.includes(currentName)) {
+                    runtimeClassNames.push(currentName);
+                }
+
+                const nextCtor = Object.getPrototypeOf(currentCtor);
+                if (!nextCtor || nextCtor === currentCtor) break;
+                currentCtor = nextCtor;
+            }
+
             const deferredClass = ["Mover", "MovableStaticMeshActor"].find(
-                name => actorClass === name || inheritance.includes(name)
+                name => runtimeClassNames.includes(name)
             );
 
             if (deferredClass) {
