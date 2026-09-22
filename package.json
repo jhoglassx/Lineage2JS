@@ -38,7 +38,7 @@
     },
     "dependencies": {
         "@dimforge/rapier3d": "^0.9.0",
-        "@l2js/core": "git+ssh://git@github.com:jhoglassx/l2js-core.git#genesis/stable",
+        "@l2js/core": "git+ssh://git@github.com:jhoglassx/l2js-core.git#0fda49876d2623fb3e377ad5023a88f68c565ad2",
         "chokidar": "^5.0.0",
         "dat.gui": "^0.7.9",
         "gmp-wasm": "^1.1.0",
