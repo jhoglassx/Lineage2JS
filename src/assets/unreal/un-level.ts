@@ -73,6 +73,7 @@ abstract class ULevel extends ULevelBase {
      */
     public getStaticMeshSceneExportInfo(): GD.ILevelStaticMeshSceneExportInfo {
         const actors: GD.IStaticMeshActorSceneExportInfo[] = [];
+        const dynamicActors: GD.IDynamicStaticMeshActorSceneExportInfo[] = [];
         const deferredActors: GD.ISceneDeferredActor[] = [];
         const errors: GD.ISceneExportError[] = [];
 
@@ -86,50 +87,19 @@ abstract class ULevel extends ULevelBase {
             // parsers outside the current StaticMeshActor migration boundary.
             if (typeof (actorRef as any)?.getSceneExportInfo !== "function") continue;
 
-            // Mover and MovableStaticMeshActor have additional chronicle-
-            // sensitive behavior/property layouts. Their base mesh placement
-            // is intentionally deferred until those actor types receive their
-            // own H5 audit; do not load them as a side effect of this export.
             const ctor = actorRef.constructor as any;
             const actorClass = ctor?.friendlyName ?? ctor?.name ?? null;
 
-            // Do not use UObject.inheritenceChain here. Dynamic package classes
-            // can inherit through native abstract bases whose getConstructorName()
-            // intentionally throws. For H5 scene discovery we only need a safe
-            // runtime constructor/prototype walk that never asks the serializer
-            // to reconstruct UnrealScript inheritance names.
-            const runtimeClassNames: string[] = [];
-            let currentCtor = ctor;
-            while (currentCtor && currentCtor !== Function.prototype) {
-                const currentName = currentCtor?.friendlyName ?? currentCtor?.name ?? null;
-                if (currentName && !runtimeClassNames.includes(currentName)) {
-                    runtimeClassNames.push(currentName);
-                }
-
-                const nextCtor = Object.getPrototypeOf(currentCtor);
-                if (!nextCtor || nextCtor === currentCtor) break;
-                currentCtor = nextCtor;
-            }
-
-            const deferredClass = [
-                "Mover",
-                "MovableStaticMeshActor",
-                "L2MovableStaticMeshActor",
-            ].find(
-                name => runtimeClassNames.includes(name)
-            );
-
-            if (deferredClass) {
-                deferredActors.push({
-                    actor: actorRef.objectName ?? actorRef.name ?? null,
-                    class: actorClass,
-                    reason: `H5 audit pending for ${deferredClass}`
-                });
-                continue;
-            }
-
             try {
                 const actor = actorRef.loadSelf() as any;
+
+                if (typeof actor?.getDynamicSceneExportInfo === "function") {
+                    const dynamicInfo = actor.getDynamicSceneExportInfo()
+                        as GD.IDynamicStaticMeshActorSceneExportInfo | null;
+                    if (dynamicInfo) dynamicActors.push(dynamicInfo);
+                    continue;
+                }
+
                 const info = actor.getSceneExportInfo() as GD.IStaticMeshActorSceneExportInfo | null;
                 if (info) actors.push(info);
             } catch (error: any) {
@@ -151,6 +121,7 @@ abstract class ULevel extends ULevelBase {
                 licenseeVersion: this.pkg?.header?.getLicenseeVersion?.() ?? null
             },
             actors,
+            dynamicActors,
             deferredActors,
             errors
         };
