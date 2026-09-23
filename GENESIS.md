@@ -130,6 +130,24 @@ The returned object is schema version 1:
 
 Actors marked deleted/pending-delete are intentionally omitted. Per-actor decode failures are captured in `errors` so one malformed object does not abort the entire map scene export.
 
+## Lineage II native material serialization
+
+Genesis now parses the Lineage II native UMaterial tail at the **UMaterial**
+inheritance level instead of treating its first dword as UTexture data.
+
+This is cross-checked against UEViewer's Lineage II serializer:
+
+- archive >= 123, licensee 16..36: obsolete reserved/native material layouts;
+- licensee >= 37 (High Five): `FLineageShaderProperty`, `ShaderCode`, then
+  `MaterialCodeVersion` (two uint16 words);
+- only after that does UTexture serialize its `Mips` array.
+
+For the validated H5 map header (archive 123 / licensee 37), this distinction is
+critical: consuming the first four bytes as the old reserved field shifts the
+mipmap array and makes a valid terrain heightmap appear to have zero mip levels.
+Texture parsing is therefore strict again after the material tail is consumed;
+Genesis no longer masks the mismatch as an opaque trailing texture payload.
+
 ## H5 terrain discovery contract
 
 Terrain is intentionally entering Genesis through a **discovery-only** contract

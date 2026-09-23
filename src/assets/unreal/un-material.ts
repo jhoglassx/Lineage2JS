@@ -63,7 +63,143 @@ abstract class UBaseModifier extends UBaseMaterial {
         return this.material?.loadSelf?.().getTextureSize() || null;
     }
 }
-abstract class UMaterial extends UBaseMaterial { }
+function skipLineageFString(pkg: C.APackage): void {
+    const length = Number(pkg.read("compat32"));
+
+    if (length === 0) return;
+
+    const bytes = length > 0 ? length : (-length * 2);
+    if (bytes < 0) {
+        throw new Error("Invalid Lineage FString length: " + String(length));
+    }
+
+    pkg.seek(pkg.tell() + bytes, "set");
+}
+
+function skipLineageFStringArray(pkg: C.APackage): void {
+    const count = Number(pkg.read("compat32"));
+    if (count < 0) {
+        throw new Error("Invalid Lineage FString array count: " + String(count));
+    }
+
+    for (let index = 0; index < count; index++) {
+        skipLineageFString(pkg);
+    }
+}
+
+function skipLineageShaderProperty(pkg: C.APackage, archiveVersion: number): void {
+    // FLineageShaderProperty, cross-checked against UEViewer's Lineage2
+    // serializer. High Five 17_25 is archive 123 / licensee 37, so the
+    // archive<129 branch is the one exercised by the current migration.
+    pkg.read("uint8");
+    pkg.read("uint8");
+
+    if (archiveVersion < 129) {
+        pkg.read("uint8");
+        pkg.read("uint8");
+        pkg.read("int32");
+        pkg.read("int32");
+        pkg.read("int32");
+    } else if (archiveVersion === 129) {
+        for (let index = 0; index < 5; index++) {
+            pkg.read("uint8");
+            pkg.read("uint8");
+            pkg.read("int32");
+            pkg.read("int32");
+            pkg.read("int32");
+        }
+    } else {
+        for (let index = 0; index < 5; index++) {
+            for (let byteIndex = 0; byteIndex < 6; byteIndex++) {
+                pkg.read("uint8");
+            }
+            pkg.read("int32");
+            pkg.read("int32");
+        }
+    }
+
+    for (let index = 0; index < 8; index++) pkg.read("uint8");
+    for (let index = 0; index < 3; index++) pkg.read("int32");
+
+    const stageCount = Number(pkg.read("compat32"));
+    if (stageCount < 0) {
+        throw new Error("Invalid Lineage material stage count: " + String(stageCount));
+    }
+
+    for (let stageIndex = 0; stageIndex < stageCount; stageIndex++) {
+        skipLineageFString(pkg);
+        skipLineageFStringArray(pkg);
+    }
+}
+
+abstract class UMaterial extends UBaseMaterial {
+    /**
+     * Lineage II serializes a native material tail between UObject properties
+     * and subclass-native payloads such as UTexture.Mips.
+     *
+     * The upstream parser historically consumed only the old reserved dword
+     * from UTexture. That is correct for older licensee versions, but High Five
+     * licensee 37 replaced that layout with FLineageShaderProperty +
+     * ShaderCode + MaterialCodeVersion. Parse/skip it here at the actual
+     * UMaterial inheritance level so every subclass starts its native payload
+     * on the correct byte boundary.
+     */
+    public doLoad(pkg: C.APackage, exp: C.UExport): this {
+        super.doLoad(pkg, exp);
+
+        const archiveVersion = pkg.header.getArchiveFileVersion();
+        const licenseeVersion = pkg.header.getLicenseeVersion();
+
+        if (archiveVersion < 123) return this;
+
+        if (licenseeVersion >= 16 && licenseeVersion < 37) {
+            // Obsolete Reserved/unk1 field.
+            pkg.read("int32");
+        }
+
+        if (licenseeVersion >= 30 && licenseeVersion < 37) {
+            if (licenseeVersion >= 33 && licenseeVersion < 36) {
+                pkg.read("uint8");
+            }
+
+            // TextureTransform, MAX_SAMPLER_NUM, MAX_TEXMAT_NUM,
+            // MAX_PASS_NUM, TwoPassRenderState, AlphaRef.
+            for (let index = 0; index < 6; index++) pkg.read("uint8");
+
+            // SrcBlend, DestBlend, OverriddenFogColor.
+            for (let index = 0; index < 3; index++) pkg.read("int32");
+
+            // Legacy matTexMatrix block.
+            for (let index = 0; index < 8; index++) {
+                pkg.read("uint8");
+                if (licenseeVersion < 36) pkg.read("uint8");
+                for (let byteIndex = 0; byteIndex < 126; byteIndex++) {
+                    pkg.read("uint8");
+                }
+            }
+
+            // FC colors + fade fields.
+            for (let index = 0; index < 8; index++) pkg.read("uint8");
+            for (let index = 0; index < 3; index++) pkg.read("int32");
+
+            for (let index = 0; index < 16; index++) skipLineageFString(pkg);
+            skipLineageFString(pkg); // ShaderCode
+        }
+
+        if (licenseeVersion >= 37) {
+            skipLineageShaderProperty(pkg, archiveVersion);
+            skipLineageFString(pkg); // ShaderCode
+        }
+
+        if (licenseeVersion >= 31) {
+            // MaterialCodeVersion is serialized as two uint16 words.
+            pkg.read("uint16");
+            pkg.read("uint16");
+        }
+
+        return this;
+    }
+}
 
 enum OutputBlending_T {
     OB_Normal,
