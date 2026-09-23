@@ -323,6 +323,7 @@ declare global {
                     map: string | null,
                     source: ISceneSourcePackageInfo,
                     actors: IStaticMeshActorSceneExportInfo[],
+                    dynamicActors: IDynamicStaticMeshActorSceneExportInfo[],
                     deferredActors: ISceneDeferredActor[],
                     errors: ISceneExportError[]
                 }
@@ -500,6 +501,20 @@ declare global {
                     skins: ISceneSkinReference[],
                     transform: IActorSceneTransformDecodeInfo,
                     bounds: IBoxDecodeInfo | null
+                }
+
+                export interface IDynamicStaticMeshActorSceneExportInfo {
+                    schemaVersion: 1,
+                    actor: IStaticMeshActorSceneExportInfo,
+                    behavior:
+                        | {
+                            kind: "mover",
+                            mover: IMoverDecodeInfo
+                        }
+                        | {
+                            kind: "swaying",
+                            swaying: ISwayingDecodeInfo
+                        }
                 }
 
                 export interface IStaticMeshActorDecodeInfo extends IBaseObjectDecodeInfo {
