@@ -422,7 +422,15 @@ declare global {
                     panW: number | null,
                     panH: number | null,
                     mapAxis: number | null,
+                    mapAxisName: string | null,
                     mapRotation: number | null,
+                    layerRotation: Vector3Arr | null,
+                    terrainMatrix: Matrix4Arr | null,
+                    scale: Vector3Arr | null,
+                    toWorld: ITerrainCoordsSourceInfo | null,
+                    toMaskmap: ITerrainCoordsSourceInfo | null,
+                    friction: number | null,
+                    restitution: number | null,
                     useAlpha: boolean | null
                 }
 

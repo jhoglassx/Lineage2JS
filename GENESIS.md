@@ -148,6 +148,23 @@ mipmap array and makes a valid terrain heightmap appear to have zero mip levels.
 Texture parsing is therefore strict again after the material tail is consumed;
 Genesis no longer masks the mismatch as an opaque trailing texture payload.
 
+## H5 terrain material discovery contract
+
+After full TerrainSector geometry is validated, Genesis may inspect serialized
+`UTerrainLayer` state without authorizing a UE5 terrain material yet.
+
+`ATerrainInfo.getTerrainDiscoveryInfo()` exposes, per ordered layer:
+
+- source `Texture`, `AlphaMap` and `LayerWeightMap` references;
+- `UScale` / `VScale`, `UPan` / `VPan`;
+- raw `TextureMapAxis` plus its enum name;
+- raw `TextureRotation` and `LayerRotation`;
+- serialized `TerrainMatrix`, `Scale`, `ToWorld` and `ToMaskmap`;
+- friction, restitution and `bUseAlpha`.
+
+This remains discovery-only metadata. It does not bake textures, synthesize
+blend weights, create UE5 materials, or choose StaticMesh versus Landscape.
+
 ## H5 single-sector geometry proof contract
 
 After discovery passes, `ATerrainInfo.getTerrainSectorGeometryProofInfo()`

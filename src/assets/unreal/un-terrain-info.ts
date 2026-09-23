@@ -267,7 +267,15 @@ abstract class ATerrainInfo extends AInfo {
                     panW: null,
                     panH: null,
                     mapAxis: null,
+                    mapAxisName: null,
                     mapRotation: null,
+                    layerRotation: null,
+                    terrainMatrix: null,
+                    scale: null,
+                    toWorld: null,
+                    toMaskmap: null,
+                    friction: null,
+                    restitution: null,
                     useAlpha: null
                 } as GD.ITerrainLayerDiscoveryInfo;
             }
@@ -283,7 +291,17 @@ abstract class ATerrainInfo extends AInfo {
                 panW: typeof layer?.panW === "number" ? layer.panW : null,
                 panH: typeof layer?.panH === "number" ? layer.panH : null,
                 mapAxis: typeof layer?.mapAxis === "number" ? layer.mapAxis : null,
+                mapAxisName: typeof layer?.mapAxis === "number"
+                    ? (TextureMapAxis_T as any)[layer.mapAxis] ?? null
+                    : null,
                 mapRotation: typeof layer?.mapRotation === "number" ? layer.mapRotation : null,
+                layerRotation: layer?.layerRotation?.toArray?.() ?? null,
+                terrainMatrix: layer?.terrainMatrix?.getElements4x4?.() ?? null,
+                scale: layer?.scale?.getElements?.() ?? null,
+                toWorld: getCoordsSnapshot(layer?.toWorld),
+                toMaskmap: getCoordsSnapshot(layer?.toMaskmap),
+                friction: typeof layer?.friction === "number" ? layer.friction : null,
+                restitution: typeof layer?.restitution === "number" ? layer.restitution : null,
                 useAlpha: typeof layer?.useAlpha === "boolean" ? layer.useAlpha : null
             } as GD.ITerrainLayerDiscoveryInfo;
         });
