@@ -180,7 +180,7 @@ Current status for the UE5 migration path:
 | StaticMesh geometry | NOT AUTHORITATIVE | Genesis uses UModel for geometry; scene export must never force Lineage2JS StaticMesh geometry decode |
 | StaticMeshActor named properties | VALIDATED-IN-PIPELINE | used for mesh refs and transforms; source archive/license versions remain attached to the report |
 | actor transform math | READY-FOR-VISUAL-VALIDATION | Lineage2JS supplies UE2 LocalToWorld including PrePivot; the UE2->UE5 bridge is still intentionally outside this fork |
-| Terrain/BSP | NOT YET H5-VALIDATED FOR GENESIS | do not use as migration authority until cross-backend/visual validation is completed |
+| Terrain | DISCOVERY-ONLY | source inventory/audit contract is available, but geometry/material/Landscape authority remains disabled until a real TerrainSector visual proof passes |\n| BSP | NOT YET H5-VALIDATED FOR GENESIS | do not use as migration authority until separately audited |
 | SkeletalMesh/Animation | NOT YET H5-VALIDATED FOR GENESIS | UEViewer shows multiple Lineage2 version-gated layouts; audit separately before character migration |
 | Emitters/Lights/Fog/Movers | NOT YET H5-VALIDATED FOR GENESIS | extend only after map StaticMeshActor reconstruction is proven |
 
