@@ -346,7 +346,8 @@ class UNativePackage extends ANativePackage {
             //         case "Mesh": Constructor = UMesh; break;
             case "MeshAnimation": Constructor = UMeshAnimation; break;
             //         case "Level": Constructor = ULevel; break;
-            case "MovableStaticMeshActor": Constructor = UMovableStaticMeshActor; break;
+            case "MovableStaticMeshActor":
+            case "L2MovableStaticMeshActor": Constructor = UMovableStaticMeshActor; break;
             //         case "Viewport": Constructor = UViewport; break;
             //         case "Client": Constructor = UClient; break;
             //         case "Player": Constructor = UPlayer; break;
