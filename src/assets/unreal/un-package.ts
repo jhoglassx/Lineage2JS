@@ -398,6 +398,7 @@ class UNativePackage extends ANativePackage {
 
             // Classes we don't care about atm are marked as UObject for general puprose constructor
             case "L2SeamlessInfo":
+            case "StaticMeshDecorationLayerData":
             case "SceneManager":
             case "PathNode":
             case "InterpolationPoint":
