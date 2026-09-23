@@ -40,6 +40,23 @@ abstract class UMover extends UStaticMeshActor {
         });
     }
 
+    public getDynamicSceneExportInfo(): GD.IDynamicStaticMeshActorSceneExportInfo | null {
+        const actor = this.getSceneExportInfo();
+        if (!actor) return null;
+
+        const mover = this.getActorDecodeInfo().mover;
+        if (!mover) return null;
+
+        return {
+            schemaVersion: 1,
+            actor,
+            behavior: {
+                kind: "mover",
+                mover
+            }
+        };
+    }
+
     protected getActorDecodeInfo(): Partial<GD.IStaticMeshActorDecodeInfo> {
         const keyPositions: GD.Vector3Arr[] = [];
         const keyQuaternions: GD.QuaternionArr[] = [];
