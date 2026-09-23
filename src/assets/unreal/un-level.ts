@@ -111,7 +111,11 @@ abstract class ULevel extends ULevelBase {
                 currentCtor = nextCtor;
             }
 
-            const deferredClass = ["Mover", "MovableStaticMeshActor"].find(
+            const deferredClass = [
+                "Mover",
+                "MovableStaticMeshActor",
+                "L2MovableStaticMeshActor",
+            ].find(
                 name => runtimeClassNames.includes(name)
             );
 
