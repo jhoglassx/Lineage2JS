@@ -327,6 +327,104 @@ declare global {
                     errors: ISceneExportError[]
                 }
 
+                export interface ITerrainCoordsSourceInfo {
+                    origin: Vector3Arr,
+                    xAxis: Vector3Arr,
+                    yAxis: Vector3Arr,
+                    zAxis: Vector3Arr
+                }
+
+                export interface ITerrainHeightSampleDiscoveryInfo {
+                    x: number,
+                    y: number,
+                    rawHeight: number,
+                    world: Vector3Arr
+                }
+
+                export interface ITerrainSectorDiscoveryInfo {
+                    sourceId: string | null,
+                    exportIndex: number | null,
+                    objectPath: string | null,
+                    name: string | null,
+                    class: string | null,
+                    offsetX: number,
+                    offsetY: number,
+                    quadsX: number,
+                    quadsY: number,
+                    quadsXActual: number,
+                    quadsYActual: number,
+                    bounds: IBoxDecodeInfo | null
+                }
+
+                export interface ITerrainLayerDiscoveryInfo {
+                    index: number,
+                    source: ISceneObjectReference | null,
+                    texture: ISceneObjectReference | null,
+                    alphaMap: ISceneObjectReference | null,
+                    weightMap: ISceneObjectReference | null,
+                    scaleW: number | null,
+                    scaleH: number | null,
+                    panW: number | null,
+                    panH: number | null,
+                    mapAxis: number | null,
+                    mapRotation: number | null,
+                    useAlpha: boolean | null
+                }
+
+                export interface ITerrainDiscoveryInfo {
+                    schemaVersion: 1,
+                    sourceId: string,
+                    exportIndex: number | null,
+                    objectPath: string | null,
+                    type: "TerrainInfo",
+                    name: string | null,
+                    class: string | null,
+                    transform: IActorSceneTransformDecodeInfo,
+                    terrainScale: Vector3Arr | null,
+                    mapCoordinates: {
+                        x: number | null,
+                        y: number | null
+                    },
+                    heightmap: {
+                        width: number,
+                        height: number,
+                        texture: ISceneObjectReference | null,
+                        textureWidth: number,
+                        textureHeight: number,
+                        textureFormat: number | null,
+                        textureFormatName: string | null,
+                        samples: ITerrainHeightSampleDiscoveryInfo[]
+                    },
+                    sectors: {
+                        count: number,
+                        gridX: number,
+                        gridY: number,
+                        items: ITerrainSectorDiscoveryInfo[]
+                    },
+                    layers: ITerrainLayerDiscoveryInfo[],
+                    bitmaps: {
+                        quadVisibilityWords: number,
+                        edgeTurnWords: number,
+                        quadVisibilityOrigWords: number,
+                        edgeTurnOrigWords: number
+                    },
+                    sourceCoords: {
+                        toWorld: ITerrainCoordsSourceInfo | null,
+                        toHeightMap: ITerrainCoordsSourceInfo | null
+                    },
+                    bounds: IBoxDecodeInfo | null,
+                    inverted: boolean,
+                    discoveryOnly: boolean
+                }
+
+                export interface ILevelTerrainDiscoveryExportInfo {
+                    schemaVersion: 1,
+                    map: string | null,
+                    source: ISceneSourcePackageInfo,
+                    terrainInfos: ITerrainDiscoveryInfo[],
+                    errors: ISceneExportError[]
+                }
+
                 export interface IStaticMeshActorSceneExportInfo {
                     schemaVersion: 1,
                     sourceId: string,

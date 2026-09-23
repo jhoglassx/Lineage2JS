@@ -152,6 +152,48 @@ abstract class ULevel extends ULevelBase {
         };
     }
 
+    /**
+     * Collect source-only TerrainInfo discovery records without loading
+     * unrelated actor classes. TerrainInfo enters discovery-only mode before
+     * loadSelf(), so legacy derived geometry generation stays outside this H5
+     * audit boundary.
+     */
+    public getTerrainDiscoveryExportInfo(): GD.ILevelTerrainDiscoveryExportInfo {
+        const terrainInfos: GD.ITerrainDiscoveryInfo[] = [];
+        const errors: GD.ISceneExportError[] = [];
+
+        for (const actorRef of this.actors || []) {
+            if (!actorRef) continue;
+            if (typeof (actorRef as any)?.getTerrainDiscoveryInfo !== "function") continue;
+
+            try {
+                (actorRef as any).enableGenesisTerrainDiscoveryMode?.();
+                const actor = actorRef.loadSelf() as any;
+                const info = actor.getTerrainDiscoveryInfo() as GD.ITerrainDiscoveryInfo;
+                if (info) terrainInfos.push(info);
+            } catch (error: any) {
+                errors.push({
+                    actor: actorRef.objectName ?? actorRef.name ?? null,
+                    class: actorRef.constructor?.friendlyName ?? actorRef.constructor?.name ?? null,
+                    error: error?.stack ?? error?.message ?? String(error)
+                });
+            }
+        }
+
+        return {
+            schemaVersion: 1,
+            map: this.url?.map ?? null,
+            source: {
+                package: this.pkg?.name ?? null,
+                path: this.pkg?.path ?? null,
+                archiveVersion: this.pkg?.header?.getArchiveFileVersion?.() ?? null,
+                licenseeVersion: this.pkg?.header?.getLicenseeVersion?.() ?? null
+            },
+            terrainInfos,
+            errors
+        };
+    }
+
     public doLoad(pkg: C.APackage, exp: C.UExport) {
         super.doLoad(pkg, exp);
 

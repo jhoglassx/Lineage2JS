@@ -130,6 +130,41 @@ The returned object is schema version 1:
 
 Actors marked deleted/pending-delete are intentionally omitted. Per-actor decode failures are captured in `errors` so one malformed object does not abort the entire map scene export.
 
+## H5 terrain discovery contract
+
+Terrain is intentionally entering Genesis through a **discovery-only** contract
+before any UE5 Landscape or terrain-mesh generation is authorized.
+
+### ATerrainInfo.getTerrainDiscoveryInfo()
+
+The TerrainInfo source record exposes only serialized/source-derived metadata:
+
+- deterministic TerrainInfo source identity and actor transform;
+- TerrainScale and map coordinates;
+- heightmap dimensions, source texture reference/format and five deterministic
+  raw-height/world-position samples;
+- TerrainSector grid dimensions and every sector's offset, quad dimensions and
+  serialized bounds;
+- terrain-layer source/texture/alpha/weight references plus UV scale/pan/axis
+  metadata;
+- quad-visibility and edge-turn bitmap word counts;
+- raw ToWorld / ToHeightMap coordinate bases;
+- aggregate serialized terrain bounds and inverted flag.
+
+`ULevel.getTerrainDiscoveryExportInfo()` discovers TerrainInfo actors through a
+prototype capability check, so unrelated H5 actors are not loaded.
+
+Before `loadSelf()`, TerrainInfo is switched into Genesis discovery-only mode.
+Its normal `postLoad()` derived work (`calcLayerTexCoords`, `updateVertices`,
+`updateTriangles`) is skipped for this path. This is deliberate: the existing
+terrain renderer/triangulation implementation predates the H5 audit and must not
+become migration authority merely because parsing succeeds.
+
+The discovery contract is suitable for inventory/self-consistency checks, but
+it is **not yet** proof that terrain geometry or materials are correct for High
+Five. The next Genesis gate is a source-driven report audit followed by a single
+real TerrainSector visual proof in UE5.
+
 ## High Five compatibility audit - current migration scope
 
 Upstream targets older Lineage II data (the README documents C4), so Genesis does not assume that a successful parse implies High Five semantic parity.
