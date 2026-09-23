@@ -121,9 +121,41 @@ abstract class UTexture extends UMaterial {
         this.mipmaps.load(pkg);
         this.readHead = pkg.tell();
 
-        console.assert(this.readTail === this.readHead);
+        if (this.readTail !== this.readHead) {
+            const unread = this.readTail - this.readHead;
 
-        // debugger;
+            // Lineage II High Five (archive 123 / later licensee revisions) can
+            // append texture-native payload after the serialized mip chain.
+            // The mipmaps are already fully decoded at this point. Treat only
+            // a positive trailing remainder as an opaque H5 extension and skip
+            // it; an over-read still indicates a real parser/layout error.
+            if (
+                verArchive >= 123
+                && verLicense >= 16
+                && unread > 0
+                && this.mipmaps.getElemCount() > 0
+            ) {
+                console.warn(
+                    "Genesis H5 texture trailing payload skipped: "
+                    + String(this.objectName ?? this.name ?? "<unknown>")
+                    + " ("
+                    + String(unread)
+                    + " byte(s))",
+                );
+                this.readHead = this.readTail;
+                pkg.seek(this.readTail, "set");
+            } else {
+                console.assert(
+                    this.readTail === this.readHead,
+                    "Texture payload cursor mismatch: "
+                    + String(this.objectName ?? this.name ?? "<unknown>")
+                    + " readHead="
+                    + String(this.readHead)
+                    + " readTail="
+                    + String(this.readTail),
+                );
+            }
+        }
 
         return this;
     }
