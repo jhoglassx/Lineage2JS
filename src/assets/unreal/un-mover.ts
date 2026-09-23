@@ -60,20 +60,23 @@ abstract class UMover extends UStaticMeshActor {
     protected getActorDecodeInfo(): Partial<GD.IStaticMeshActorDecodeInfo> {
         const keyPositions: GD.Vector3Arr[] = [];
         const keyQuaternions: GD.QuaternionArr[] = [];
+        const numKeys = Math.max(0, Number(this.numKeys ?? 0));
+        const basePos = this.basePos ?? this.location;
+        const baseRot = this.baseRot ?? this.rotation;
 
-        for (let i = 0; i < this.numKeys; i++) {
-            const keyPos = this.keyPos[i];
-            const keyRot = this.keyRot[i];
+        for (let i = 0; i < numKeys; i++) {
+            const keyPos = this.keyPos?.[i] ?? null;
+            const keyRot = this.keyRot?.[i] ?? null;
             const rot = FRotator.make(
-                this.baseRot.pitch + (keyRot ? keyRot.pitch : 0),
-                this.baseRot.yaw + (keyRot ? keyRot.yaw : 0),
-                this.baseRot.roll + (keyRot ? keyRot.roll : 0)
+                (baseRot?.pitch ?? 0) + (keyRot ? keyRot.pitch : 0),
+                (baseRot?.yaw ?? 0) + (keyRot ? keyRot.yaw : 0),
+                (baseRot?.roll ?? 0) + (keyRot ? keyRot.roll : 0)
             );
 
             keyPositions.push([
-                this.basePos.x + (keyPos ? keyPos.x : 0),
-                this.basePos.y + (keyPos ? keyPos.y : 0),
-                this.basePos.z + (keyPos ? keyPos.z : 0)
+                (basePos?.x ?? 0) + (keyPos ? keyPos.x : 0),
+                (basePos?.y ?? 0) + (keyPos ? keyPos.y : 0),
+                (basePos?.z ?? 0) + (keyPos ? keyPos.z : 0)
             ]);
             keyQuaternions.push(rot.getQuaternionElements());
         }
@@ -82,7 +85,7 @@ abstract class UMover extends UStaticMeshActor {
             dontBatch: true,
             mover: {
                 initialState: this.initialState,
-                keyNum: this.keyNum,
+                keyNum: Number(this.keyNum ?? 0),
                 keyPositions,
                 keyQuaternions,
                 moveTime: this.moveTime,
