@@ -94,8 +94,9 @@ abstract class ULevel extends ULevelBase {
                 const actor = actorRef.loadSelf() as any;
 
                 if (typeof actor?.getDynamicSceneExportInfo === "function") {
-                    const dynamicInfo = actor.getDynamicSceneExportInfo()
-                        as GD.IDynamicStaticMeshActorSceneExportInfo | null;
+                    const dynamicInfo = (
+                        actor.getDynamicSceneExportInfo()
+                    ) as GD.IDynamicStaticMeshActorSceneExportInfo | null;
                     if (dynamicInfo) dynamicActors.push(dynamicInfo);
                     continue;
                 }
