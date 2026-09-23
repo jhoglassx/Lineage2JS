@@ -44,6 +44,44 @@ abstract class UMovableStaticMeshActor extends UStaticMeshActor {
         });
     }
 
+    public getDynamicSceneExportInfo(): GD.IDynamicStaticMeshActorSceneExportInfo | null {
+        const actor = this.getSceneExportInfo();
+        if (!actor) return null;
+
+        const swaying = this.getActorDecodeInfo().swaying;
+        if (!swaying) {
+            return {
+                schemaVersion: 1,
+                actor,
+                behavior: {
+                    kind: "swaying",
+                    swaying: {
+                        tags: [],
+                        orgRotator: [
+                            this.rotation?.pitch ?? 0,
+                            this.rotation?.yaw ?? 0,
+                            this.rotation?.roll ?? 0
+                        ],
+                        rate: [0, 0, 0],
+                        max: [0, 0, 0],
+                        accelRatio: [0, 0, 0],
+                        maxRandom: false,
+                        randomStart: false
+                    }
+                }
+            };
+        }
+
+        return {
+            schemaVersion: 1,
+            actor,
+            behavior: {
+                kind: "swaying",
+                swaying
+            }
+        };
+    }
+
     protected getActorDecodeInfo(): Partial<GD.IStaticMeshActorDecodeInfo> {
         if (!this.l2RotatorRate && !this.l2RotatorMax) return {};
 
