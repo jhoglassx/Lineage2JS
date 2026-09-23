@@ -148,6 +148,26 @@ mipmap array and makes a valid terrain heightmap appear to have zero mip levels.
 Texture parsing is therefore strict again after the material tail is consumed;
 Genesis no longer masks the mismatch as an opaque trailing texture payload.
 
+## H5 single-sector geometry proof contract
+
+After discovery passes, `ATerrainInfo.getTerrainSectorGeometryProofInfo()`
+can expose one real TerrainSector for visual validation.
+
+The proof is still source-driven:
+
+- heights come directly from the decoded TerrainMap mip;
+- world positions use TerrainInfo's serialized `ToWorld` transform;
+- quad visibility comes from `QuadVisibilityBitmapOrig`;
+- diagonal choice comes from `EdgeTurnBitmapOrig`;
+- the triangle split mirrors the UE2 seamless-terrain topology;
+- it does **not** call the older `updateVertices()` or
+  `UTerrainSector.generateTriangles()` paths.
+
+The proof returns a small local mesh around a deterministic world-space anchor,
+plus source/world vertices and topology statistics. Its authority remains
+`SINGLE_SECTOR_GEOMETRY_PROOF`: full terrain, materials and UE5 Landscape are
+still explicitly unauthorized until the visual proof passes.
+
 ## H5 terrain discovery contract
 
 Terrain is intentionally entering Genesis through a **discovery-only** contract

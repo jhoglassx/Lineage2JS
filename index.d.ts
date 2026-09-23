@@ -327,6 +327,61 @@ declare global {
                     errors: ISceneExportError[]
                 }
 
+                export interface ITerrainSectorProofVertex {
+                    x: number,
+                    y: number,
+                    localX: number,
+                    localY: number,
+                    rawHeight: number,
+                    world: Vector3Arr
+                }
+
+                export interface ITerrainSectorGeometryProofInfo {
+                    schemaVersion: 1,
+                    coordinateProfile: "umodel-gltf-ue5-roundtrip-v1",
+                    terrainInfoSourceId: string,
+                    sectorIndex: number,
+                    sector: ISceneObjectReference & {
+                        offsetX: number,
+                        offsetY: number,
+                        quadsX: number,
+                        quadsY: number
+                    },
+                    heightmap: {
+                        width: number,
+                        height: number,
+                        format: number | null,
+                        formatName: string | null
+                    },
+                    anchorWorld: Vector3Arr,
+                    boundsWorld: {
+                        min: Vector3Arr,
+                        max: Vector3Arr
+                    },
+                    grid: {
+                        vertexColumns: number,
+                        vertexRows: number,
+                        vertices: ITerrainSectorProofVertex[],
+                        localPositionsCm: Vector3Arr[],
+                        uvs: Vector2Arr[]
+                    },
+                    topology: {
+                        indices: number[],
+                        visibleQuads: number,
+                        hiddenQuads: number,
+                        edgeTurnQuads: number,
+                        triangleCount: number
+                    },
+                    authority: {
+                        mode: "SINGLE_SECTOR_GEOMETRY_PROOF",
+                        usesLegacyGeneratedVertices: false,
+                        usesLegacyGenerateTriangles: false,
+                        fullTerrainAuthorized: false,
+                        materialAuthorized: false,
+                        ue5LandscapeAuthorized: false
+                    }
+                }
+
                 export interface ITerrainCoordsSourceInfo {
                     origin: Vector3Arr,
                     xAxis: Vector3Arr,

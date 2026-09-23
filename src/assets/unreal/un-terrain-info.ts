@@ -356,6 +356,178 @@ abstract class ATerrainInfo extends AInfo {
         };
     }
 
+    public getTerrainSectorGeometryProofInfo(
+        sectorIndex: number,
+    ): GD.ITerrainSectorGeometryProofInfo {
+        const terrainMap = this.terrainMap?.loadSelf?.() ?? this.terrainMap;
+        if (!terrainMap || terrainMap.mipmaps?.getElemCount?.() <= 0) {
+            throw new Error("Terrain heightmap mip data is unavailable");
+        }
+
+        const sectorRefs = getTerrainArrayValues(this.sectors);
+        if (!Number.isInteger(sectorIndex) || sectorIndex < 0 || sectorIndex >= sectorRefs.length) {
+            throw new Error(
+                "TerrainSector index out of range: "
+                + String(sectorIndex)
+                + " (count="
+                + String(sectorRefs.length)
+                + ")",
+            );
+        }
+
+        const sectorRef = sectorRefs[sectorIndex];
+        const sector = sectorRef?.loadSelf?.() ?? sectorRef;
+        if (!sector) {
+            throw new Error("TerrainSector is null at index " + String(sectorIndex));
+        }
+
+        const offsetX = Number(sector.offsetX ?? 0);
+        const offsetY = Number(sector.offsetY ?? 0);
+        const quadsX = Number(sector.quadsXActual ?? sector.quadsX ?? 0);
+        const quadsY = Number(sector.quadsYActual ?? sector.quadsY ?? 0);
+        if (quadsX <= 0 || quadsY <= 0) {
+            throw new Error(
+                "TerrainSector has invalid quad dimensions: "
+                + String(quadsX)
+                + "x"
+                + String(quadsY),
+            );
+        }
+
+        const vertexColumns = quadsX + 1;
+        const vertexRows = quadsY + 1;
+        const vertices: GD.ITerrainSectorProofVertex[] = [];
+        const min = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+        const max = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+
+        for (let localY = 0; localY < vertexRows; localY++) {
+            for (let localX = 0; localX < vertexColumns; localX++) {
+                const x = Math.min(offsetX + localX, this.heightmapX - 1);
+                const y = Math.min(offsetY + localY, this.heightmapY - 1);
+                const rawHeight = this.getHeightmap(x, y);
+                const world = this.heightmapToWorld(
+                    FVector.make(x, y, rawHeight),
+                ).getElements() as GD.Vector3Arr;
+
+                for (let axis = 0; axis < 3; axis++) {
+                    min[axis] = Math.min(min[axis], world[axis]);
+                    max[axis] = Math.max(max[axis], world[axis]);
+                }
+
+                vertices.push({
+                    x,
+                    y,
+                    localX,
+                    localY,
+                    rawHeight,
+                    world,
+                });
+            }
+        }
+
+        const anchorWorld: GD.Vector3Arr = [
+            (min[0] + max[0]) * 0.5,
+            (min[1] + max[1]) * 0.5,
+            (min[2] + max[2]) * 0.5,
+        ];
+        const localPositionsCm = vertices.map(vertex => [
+            vertex.world[0] - anchorWorld[0],
+            vertex.world[1] - anchorWorld[1],
+            vertex.world[2] - anchorWorld[2],
+        ] as GD.Vector3Arr);
+
+        const indices: number[] = [];
+        let visibleQuads = 0;
+        let hiddenQuads = 0;
+        let edgeTurnQuads = 0;
+
+        for (let localY = 0; localY < quadsY; localY++) {
+            for (let localX = 0; localX < quadsX; localX++) {
+                const x = offsetX + localX;
+                const y = offsetY + localY;
+                const visible = this.getQuadVisibilityBitmapOrig(x, y);
+                const edgeTurn = this.getEdgeTurnBitmapOrig(x, y);
+
+                if (!visible) {
+                    hiddenQuads++;
+                    continue;
+                }
+
+                visibleQuads++;
+                if (edgeTurn) edgeTurnQuads++;
+
+                const v1 = localY * vertexColumns + localX;
+                const v2 = v1 + 1;
+                const v4 = (localY + 1) * vertexColumns + localX;
+                const v3 = v4 + 1;
+
+                // Source-driven copy of the UE2 seamless terrain split:
+                // turned -> v4-v2 diagonal, normal -> v1-v3 diagonal.
+                // We intentionally do not call UTerrainSector.generateTriangles().
+                if (edgeTurn) {
+                    indices.push(v1, v4, v2, v4, v3, v2);
+                } else {
+                    indices.push(v1, v4, v3, v1, v3, v2);
+                }
+            }
+        }
+
+        const uvs = vertices.map(vertex => [
+            quadsX > 0 ? vertex.localX / quadsX : 0,
+            quadsY > 0 ? vertex.localY / quadsY : 0,
+        ] as GD.Vector2Arr);
+
+        return {
+            schemaVersion: 1,
+            coordinateProfile: "umodel-gltf-ue5-roundtrip-v1",
+            terrainInfoSourceId: this.getSceneSourceId(),
+            sectorIndex,
+            sector: {
+                ...getTerrainSceneObjectReference(sectorRef),
+                offsetX,
+                offsetY,
+                quadsX,
+                quadsY,
+            },
+            heightmap: {
+                width: this.heightmapX,
+                height: this.heightmapY,
+                format: terrainMap.format ?? null,
+                formatName:
+                    typeof terrainMap.format === "number"
+                        ? (ETextureFormat as any)[terrainMap.format] ?? null
+                        : null,
+            },
+            anchorWorld,
+            boundsWorld: {
+                min: min as GD.Vector3Arr,
+                max: max as GD.Vector3Arr,
+            },
+            grid: {
+                vertexColumns,
+                vertexRows,
+                vertices,
+                localPositionsCm,
+                uvs,
+            },
+            topology: {
+                indices,
+                visibleQuads,
+                hiddenQuads,
+                edgeTurnQuads,
+                triangleCount: indices.length / 3,
+            },
+            authority: {
+                mode: "SINGLE_SECTOR_GEOMETRY_PROOF",
+                usesLegacyGeneratedVertices: false,
+                usesLegacyGenerateTriangles: false,
+                fullTerrainAuthorized: false,
+                materialAuthorized: false,
+                ue5LandscapeAuthorized: false,
+            },
+        };
+    }
+
     protected getPropertyMap() {
         return Object.assign({}, super.getPropertyMap(), {
             "TerrainMap": "terrainMap",
