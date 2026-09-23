@@ -220,22 +220,38 @@ abstract class ATerrainInfo extends AInfo {
     public getTerrainDiscoveryInfo(): GD.ITerrainDiscoveryInfo {
         const terrainMap = this.terrainMap?.loadSelf?.() ?? this.terrainMap ?? null;
         const terrainMapRef = getTerrainSceneObjectReference(this.terrainMap);
-        const sectors = getTerrainArrayValues(this.sectors).map((sector: any) => {
-            const source = getTerrainSceneObjectReference(sector);
-            return {
-                sourceId: source?.sourceId ?? null,
-                exportIndex: source?.exportIndex ?? null,
-                objectPath: source?.objectPath ?? null,
-                name: source?.name ?? null,
-                class: source?.class ?? null,
-                offsetX: Number(sector?.offsetX ?? 0),
-                offsetY: Number(sector?.offsetY ?? 0),
-                quadsX: Number(sector?.quadsX ?? 0),
-                quadsY: Number(sector?.quadsY ?? 0),
-                quadsXActual: Number(sector?.quadsXActual ?? sector?.quadsX ?? 0),
-                quadsYActual: Number(sector?.quadsYActual ?? sector?.quadsY ?? 0),
-                bounds: sector?.boundingBox?.getDecodeInfo?.() ?? null
-            } as GD.ITerrainSectorDiscoveryInfo;
+        const sectors = getTerrainArrayValues(this.sectors).map((sectorRef: any) => {
+            const source = getTerrainSceneObjectReference(sectorRef);
+
+            try {
+                // TerrainInfo is fully loaded at this point, so sector-native
+                // reads can safely move the package cursor without corrupting
+                // the parent TerrainInfo stream.
+                const sector = sectorRef?.loadSelf?.() ?? sectorRef;
+
+                return {
+                    sourceId: source?.sourceId ?? null,
+                    exportIndex: source?.exportIndex ?? null,
+                    objectPath: source?.objectPath ?? null,
+                    name: source?.name ?? null,
+                    class: source?.class ?? null,
+                    offsetX: Number(sector?.offsetX ?? 0),
+                    offsetY: Number(sector?.offsetY ?? 0),
+                    quadsX: Number(sector?.quadsX ?? 0),
+                    quadsY: Number(sector?.quadsY ?? 0),
+                    quadsXActual: Number(sector?.quadsXActual ?? sector?.quadsX ?? 0),
+                    quadsYActual: Number(sector?.quadsYActual ?? sector?.quadsY ?? 0),
+                    bounds: sector?.boundingBox?.getDecodeInfo?.() ?? null
+                } as GD.ITerrainSectorDiscoveryInfo;
+            } catch (error: any) {
+                const detail = error?.stack ?? error?.message ?? String(error);
+                throw new Error(
+                    "Failed to load H5 TerrainSector "
+                    + String(source?.sourceId ?? source?.name ?? "<unknown>")
+                    + ": "
+                    + detail,
+                );
+            }
         });
 
         const layers = getTerrainArrayValues(this.layers).map((layerRef: any, index: number) => {
@@ -552,14 +568,27 @@ abstract class ATerrainInfo extends AInfo {
         this.vertexColors = new FArray(FColor.class());
 
         {
-            this.sectors = new FObjectArray<GA.UTerrainSector>().load(pkg).loadSelf();
-
+            // The serialized TerrainInfo stream contains only the sector object
+            // references here. Loading those sector exports moves the shared
+            // package cursor to each sector's export body, so preserve the
+            // TerrainInfo continuation cursor *before* loading sector objects.
+            //
+            // Genesis discovery intentionally defers sector loadSelf() until the
+            // TerrainInfo object itself is fully loaded. This keeps H5 discovery
+            // source-driven and avoids nested export reads corrupting the parent
+            // object's native stream position.
+            this.sectors = new FObjectArray<GA.UTerrainSector>().load(pkg);
             this.readHead = pkg.tell();
 
-            this.sectors.forEach(sector => {
-                this.boundingBox.expandByPoint(sector.boundingBox.min);
-                this.boundingBox.expandByPoint(sector.boundingBox.max);
-            });
+            if (!this.genesisTerrainDiscoveryOnly) {
+                this.sectors.loadSelf();
+
+                this.sectors.forEach(sector => {
+                    if (!sector?.boundingBox) return;
+                    this.boundingBox.expandByPoint(sector.boundingBox.min);
+                    this.boundingBox.expandByPoint(sector.boundingBox.max);
+                });
+            }
 
             pkg.seek(this.readHead, "set");
 
