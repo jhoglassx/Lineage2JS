@@ -275,7 +275,8 @@ class UNativePackage extends ANativePackage {
             case "L2EnvironmentColorInfo": Constructor = UL2EnvironmentColorInfo; break;
 
             case "L2RotatorTime": Constructor = FL2RotatorTime; break;
-            case "SkillActionInfo": Constructor = UObject; break;
+            case "SkillActionInfo":
+            case "StaticMeshDecorationLayerData": Constructor = UObject; break;
 
             // structs we dont care about yet
             case "InterpCurve":
