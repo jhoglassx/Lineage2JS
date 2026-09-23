@@ -21,6 +21,59 @@ const MAP_SIZE_X = 128 * 256;
 const MAP_SIZE_Y = 128 * 256;
 const cacheTextureRgba = new WeakMap<GA.UTexture, Uint8Array>();
 
+function getTerrainSceneObjectReference(value: any): GD.ISceneObjectReference | null {
+    if (!value) return null;
+    const ctor = value?.constructor;
+    const pkg = value?.pkg;
+    const packagePath = pkg?.path ?? pkg?.name ?? "unknown-package";
+    const objectPath = value?.name ?? value?.objectName ?? "unknown-object";
+    const exportIndex = Number.isInteger(value?.exportIndex) ? value.exportIndex : null;
+    const sourceId = exportIndex !== null
+        ? packagePath + "#export:" + exportIndex
+        : packagePath + "#object:" + objectPath;
+    return {
+        sourceId,
+        package: pkg?.name ?? null,
+        path: pkg?.path ?? null,
+        objectPath: value?.name ?? null,
+        exportIndex,
+        name: value?.objectName ?? value?.name ?? null,
+        class: ctor?.friendlyName ?? ctor?.name ?? null
+    };
+}
+
+function getTerrainArrayValues(value: any): any[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    const count = typeof value.getElemCount === "function"
+        ? Number(value.getElemCount())
+        : typeof value.length === "number"
+            ? Number(value.length)
+            : 0;
+    const result: any[] = [];
+    for (let index = 0; index < count; index++) {
+        result.push(typeof value.getElem === "function" ? value.getElem(index) : value[index]);
+    }
+    return result;
+}
+
+function getCoordsSnapshot(coords: any): GD.ITerrainCoordsSourceInfo | null {
+    if (!coords) return null;
+    return {
+        origin: coords.origin?.getElements?.() ?? [0, 0, 0],
+        xAxis: coords.xAxis?.getElements?.() ?? [1, 0, 0],
+        yAxis: coords.yAxis?.getElements?.() ?? [0, 1, 0],
+        zAxis: coords.zAxis?.getElements?.() ?? [0, 0, 1]
+    };
+}
+
+function getBitmapWordCount(bitmap: any): number {
+    if (!bitmap) return 0;
+    if (typeof bitmap.getElemCount === "function") return Number(bitmap.getElemCount());
+    if (typeof bitmap.length === "number") return Number(bitmap.length);
+    return 0;
+}
+
 function getTextureRgba(texture: GA.UTexture): Uint8Array {
     if (cacheTextureRgba.has(texture)) return cacheTextureRgba.get(texture);
 
@@ -97,6 +150,13 @@ abstract class ATerrainInfo extends AInfo {
 
     public readonly isTerrainInfo = true;
 
+    /**
+     * Genesis terrain audit mode. This skips derived renderer/geometry work in
+     * postLoad() so discovery does not accidentally promote legacy terrain
+     * triangulation to H5 migration authority.
+     */
+    protected genesisTerrainDiscoveryOnly = false;
+
     declare protected sectorsX: number;
     declare protected sectorsY: number;
     declare public toWorld: GA.FCoords;
@@ -151,6 +211,134 @@ abstract class ATerrainInfo extends AInfo {
     // protected _toHeightmapOrig: any;
     // protected _nightMapStart: any;
     // protected _dayMapStart: any;
+
+    public enableGenesisTerrainDiscoveryMode(): this {
+        this.genesisTerrainDiscoveryOnly = true;
+        return this;
+    }
+
+    public getTerrainDiscoveryInfo(): GD.ITerrainDiscoveryInfo {
+        const terrainMap = this.terrainMap?.loadSelf?.() ?? this.terrainMap ?? null;
+        const terrainMapRef = getTerrainSceneObjectReference(this.terrainMap);
+        const sectors = getTerrainArrayValues(this.sectors).map((sector: any) => {
+            const source = getTerrainSceneObjectReference(sector);
+            return {
+                sourceId: source?.sourceId ?? null,
+                exportIndex: source?.exportIndex ?? null,
+                objectPath: source?.objectPath ?? null,
+                name: source?.name ?? null,
+                class: source?.class ?? null,
+                offsetX: Number(sector?.offsetX ?? 0),
+                offsetY: Number(sector?.offsetY ?? 0),
+                quadsX: Number(sector?.quadsX ?? 0),
+                quadsY: Number(sector?.quadsY ?? 0),
+                quadsXActual: Number(sector?.quadsXActual ?? sector?.quadsX ?? 0),
+                quadsYActual: Number(sector?.quadsYActual ?? sector?.quadsY ?? 0),
+                bounds: sector?.boundingBox?.getDecodeInfo?.() ?? null
+            } as GD.ITerrainSectorDiscoveryInfo;
+        });
+
+        const layers = getTerrainArrayValues(this.layers).map((layerRef: any, index: number) => {
+            if (!layerRef) {
+                return {
+                    index,
+                    source: null,
+                    texture: null,
+                    alphaMap: null,
+                    weightMap: null,
+                    scaleW: null,
+                    scaleH: null,
+                    panW: null,
+                    panH: null,
+                    mapAxis: null,
+                    mapRotation: null,
+                    useAlpha: null
+                } as GD.ITerrainLayerDiscoveryInfo;
+            }
+            const layer = layerRef.loadSelf?.() ?? layerRef;
+            return {
+                index,
+                source: getTerrainSceneObjectReference(layerRef),
+                texture: getTerrainSceneObjectReference(layer?.map),
+                alphaMap: getTerrainSceneObjectReference(layer?.alphaMap),
+                weightMap: getTerrainSceneObjectReference(layer?.weightMap),
+                scaleW: typeof layer?.scaleW === "number" ? layer.scaleW : null,
+                scaleH: typeof layer?.scaleH === "number" ? layer.scaleH : null,
+                panW: typeof layer?.panW === "number" ? layer.panW : null,
+                panH: typeof layer?.panH === "number" ? layer.panH : null,
+                mapAxis: typeof layer?.mapAxis === "number" ? layer.mapAxis : null,
+                mapRotation: typeof layer?.mapRotation === "number" ? layer.mapRotation : null,
+                useAlpha: typeof layer?.useAlpha === "boolean" ? layer.useAlpha : null
+            } as GD.ITerrainLayerDiscoveryInfo;
+        });
+
+        const sampleCoords: Array<[number, number]> = [];
+        if (this.heightmapX > 0 && this.heightmapY > 0 && terrainMap) {
+            const maxX = this.heightmapX - 1;
+            const maxY = this.heightmapY - 1;
+            const midX = Math.floor(maxX / 2);
+            const midY = Math.floor(maxY / 2);
+            for (const candidate of [[0, 0], [maxX, 0], [0, maxY], [maxX, maxY], [midX, midY]] as Array<[number, number]>) {
+                if (!sampleCoords.some(([x, y]) => x === candidate[0] && y === candidate[1])) {
+                    sampleCoords.push(candidate);
+                }
+            }
+        }
+
+        const heightSamples = sampleCoords.map(([x, y]) => {
+            const rawHeight = this.getHeightmap(x, y);
+            const world = this.heightmapToWorld(FVector.make(x, y, rawHeight));
+            return { x, y, rawHeight, world: world.getElements() } as GD.ITerrainHeightSampleDiscoveryInfo;
+        });
+
+        return {
+            schemaVersion: 1,
+            sourceId: this.getSceneSourceId(),
+            exportIndex: Number.isInteger(this.exportIndex) ? this.exportIndex : null,
+            objectPath: this.name ?? null,
+            type: "TerrainInfo",
+            name: this.objectName ?? null,
+            class: this.constructor.friendlyName ?? this.constructor.name ?? null,
+            transform: this.getSceneTransformInfo(),
+            terrainScale: this.terrainScale?.getElements?.() ?? null,
+            mapCoordinates: {
+                x: typeof this.mapX === "number" ? this.mapX : null,
+                y: typeof this.mapY === "number" ? this.mapY : null
+            },
+            heightmap: {
+                width: Number(this.heightmapX ?? 0),
+                height: Number(this.heightmapY ?? 0),
+                texture: terrainMapRef,
+                textureWidth: Number(terrainMap?.width ?? 0),
+                textureHeight: Number(terrainMap?.height ?? 0),
+                textureFormat: terrainMap?.format ?? null,
+                textureFormatName: typeof terrainMap?.format === "number"
+                    ? (ETextureFormat as any)[terrainMap.format] ?? null
+                    : null,
+                samples: heightSamples
+            },
+            sectors: {
+                count: sectors.length,
+                gridX: Number(this.sectorsX ?? 0),
+                gridY: Number(this.sectorsY ?? 0),
+                items: sectors
+            },
+            layers,
+            bitmaps: {
+                quadVisibilityWords: getBitmapWordCount(this.quadVisibilityBitmap),
+                edgeTurnWords: getBitmapWordCount(this.edgeTurnBitmap),
+                quadVisibilityOrigWords: getBitmapWordCount(this.quadVisibilityBitmapOrig),
+                edgeTurnOrigWords: getBitmapWordCount(this.edgeTurnBitmapOrig)
+            },
+            sourceCoords: {
+                toWorld: getCoordsSnapshot(this.toWorld),
+                toHeightMap: getCoordsSnapshot(this.toHeightMap)
+            },
+            bounds: this.boundingBox?.getDecodeInfo?.() ?? null,
+            inverted: this.isInvertedTerrain(),
+            discoveryOnly: this.genesisTerrainDiscoveryOnly
+        };
+    }
 
     protected getPropertyMap() {
         return Object.assign({}, super.getPropertyMap(), {
@@ -668,6 +856,10 @@ abstract class ATerrainInfo extends AInfo {
 
     public postLoad(pkg: C.APackage, exp: C.UExport<C.UObject>) {
         super.postLoad(pkg, exp);
+
+        if (this.genesisTerrainDiscoveryOnly) {
+            return;
+        }
 
         let startX = 0, startY = 0;
         let endX = this.heightmapX, endY = this.heightmapY;
