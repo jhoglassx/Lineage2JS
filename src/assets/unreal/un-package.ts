@@ -333,8 +333,10 @@ class UNativePackage extends ANativePackage {
             case "PlayerStart": Constructor = UPlayerStart; break;
             case "Camera": Constructor = UCamera; break;
 
-            case "PhysicsVolume": Constructor = UPhysicsVolume; break;
-            case "BlockingVolume": Constructor = UBlockingVolume; break;
+            case "PhysicsVolume":
+            case "DefaultPhysicsVolume": Constructor = UPhysicsVolume; break;
+            case "BlockingVolume":
+            case "ServerBlockingVolume": Constructor = UBlockingVolume; break;
             case "MusicVolume": Constructor = UMusicVolume; break;
             case "ConvexVolume": Constructor = UConvexVolume; break;
 
